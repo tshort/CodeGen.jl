@@ -304,29 +304,18 @@ function codegen!(cg::CodeCtx, ::Val{:gotoifnot}, args)
     position!(cg.builder, ifso)
 end
 
-
 #
 # New - structure creation
 #
 function codegen!(cg::CodeCtx, ::Val{:new}, args)
-    typ = args[1]
+    typ = LLVM.GenericValue(Ptr{DataType}(pointer_from_objref(eval(args[1]))))
     res = LLVM.call!(cg.builder, jl_new_struct_uninit_f, LLVM.Value[typ])
     # set the fields
     for i in 2:length(args)
-            # jl_value_t *ft = jl_field_type(thetype, i - 1);
-            # jl_value_t *fldv = eval(args[i], s);
-            # if (!jl_isa(fldv, ft))
-            #     jl_type_error("new", ft, fldv);
-            # jl_set_nth_field(v, i - 1, fldv);
+        rhs = codegen!(cg, args[i])  # need to box?
+        offset = codegen!(cg, UInt32(i - 1))
+        LLVM.call!(cg.builder, jl_set_nth_field_f, LLVM.Value[res, offset, rhs])
     end
     return res
 end
-        v = jl_new_struct_uninit((jl_datatype_t*)thetype);
-        for (size_t i = 1; i < nargs; i++) {
-            jl_value_t *ft = jl_field_type(thetype, i - 1);
-            jl_value_t *fldv = eval(args[i], s);
-            if (!jl_isa(fldv, ft))
-                jl_type_error("new", ft, fldv);
-            jl_set_nth_field(v, i - 1, fldv);
-        }
 

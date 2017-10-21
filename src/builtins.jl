@@ -37,9 +37,8 @@ function emit_builtin!(cg::CodeCtx, name, args)
         @show i, args[i]
         @show LLVM.llvmtype(args[i])
         v = emit_box!(cg, args[i], LLVM.llvmtype(args[i]))
-        ## SEGFAULT HERE
-        # p = LLVM.gep!(cg.builder, newargs, [codegen!(cg, i-1)])
-        # LLVM.store!(cg.builder, v, p)
+        p = LLVM.gep!(cg.builder, newargs, [codegen!(cg, i-1)])
+        LLVM.store!(cg.builder, v, p)
     end
     println("Almost done")
     func = builtins[name]
