@@ -81,6 +81,12 @@ function emit_intrinsic!(cg::CodeCtx, name, args)
     # pointerref:
     # pointerset:
 
+    ######
+    ## NOT UNIVERSAL, but maybe useful for getting a few things to work
+    name == :select_value && return LLVM.select!(cg.builder, args[1], args[2], args[3])
+    name == :not_int      && return LLVM.not!(cg.builder, args[1])
+    ######
+
     error("Unsupported intrinsic: $name")
 end
 
