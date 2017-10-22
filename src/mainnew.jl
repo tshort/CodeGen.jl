@@ -27,11 +27,27 @@ mutable struct CodeCtx <: AbstractCodeCtx
             length(argtypes.parameters))
 end
 
-CodeCtx(ci::CodeInfo, result_type::DataType, name, argtypes) =
-    CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), ci, result_type, name, argtypes)
+function CodeCtx(ci::CodeInfo, result_type::DataType, name, argtypes)
+    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), ci, result_type, name, argtypes)
+    cg.builtin = setup_builtins!(cg)
+    cg.extern = setup_externs!(cg.mod)
+    cg.slots = Vector{LLVM.Value}(length(ci.slotnames))
+    cg.ssas = Dict{Int, LLVM.Value}()
+    cg.labels = Dict{Int, Any}()
+    cg.current_scope = CurrentScope()
+    return cg
+end
 
-CodeCtx(cg::CodeCtx, ci::CodeInfo, result_type::DataType, name, argtypes) =
-    CodeCtx(cg.mod, ci, result_type, name, argtypes)
+function CodeCtx(orig_cg::CodeCtx, ci::CodeInfo, result_type::DataType, name, argtypes)
+    cg = CodeCtx(orig_cg.mod, ci, result_type, name, argtypes)
+    cg.builtin = orig_cg.builtin
+    cg.extern = orig_cg.extern
+    cg.slots = Vector{LLVM.Value}(length(ci.slotnames))
+    cg.ssas = Dict{Int, LLVM.Value}()
+    cg.labels = Dict{Int, Any}()
+    cg.current_scope = CurrentScope()
+    return cg
+end
 
 Base.show(io::IO, cg::CodeCtx) = print(io, "CodeCtx")
 
@@ -73,14 +89,8 @@ function codegen!(cg::CodeCtx)
     argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
     func_type = LLVM.FunctionType(llvmtype(cg.result_type), argtypes)
     cg.func = LLVM.Function(cg.mod, cg.name, func_type)
-    cg.slots = Vector{LLVM.Value}(length(ci.slotnames))
-    cg.ssas = Dict{Int, LLVM.Value}()
-    cg.labels = Dict{Int, Any}()
     cg.nargs = length(argtypes)
-    cg.current_scope = CurrentScope()
     LLVM.linkage!(cg.func, LLVM.API.LLVMExternalLinkage)
-    cg.builtin = setup_builtins!(cg)
-    cg.extern = setup_externs!(cg.mod)
     entry = LLVM.BasicBlock(cg.func, "entry", ctx)
     LLVM.position!(cg.builder, entry)
     for (i, param) in enumerate(LLVM.parameters(cg.func))
