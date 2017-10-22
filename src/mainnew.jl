@@ -263,17 +263,17 @@ codegen!(cg::CodeCtx, ::NewvarNode) = nothing
 # ccall
 #
 function codegen!(cg::CodeCtx, ::Val{:foreigncall}, args)
-    name = string(args[1].value)
+    name = args[1].value
+    if haskey(cg.extern, name)
+        func = cg.extern[name]
+    else
+        func = extern!(cg.mod, name, llvmtype(args[2]), llvmtype.(collect(args[3])))
+    end
     llvmargs = LLVM.Value[]
     for v in args[6:end]
-        @show v
         push!(llvmargs, codegen!(cg, v))
     end
     
-    func_type = LLVM.FunctionType(llvmtype(args[2]), llvmtype.(collect(args[3])))
-    func = LLVM.Function(cg.mod, name, func_type)
-    LLVM.linkage!(func, LLVM.API.LLVMExternalLinkage)
-
     return LLVM.call!(cg.builder, func, llvmargs)
 end
 
@@ -330,8 +330,8 @@ end
 # New - structure creation
 #
 function codegen!(cg::CodeCtx, ::Val{:new}, args)
-    typ = LLVM.GenericValue(Ptr{DataType}(pointer_from_objref(eval(args[1]))))
-    res = LLVM.call!(cg.builder, cg.extern[:jl_new_struct_uninit_f], LLVM.Value[typ])
+    dt = get_and_emit_datatype!(cg, args[1])
+    res = LLVM.call!(cg.builder, cg.extern[:jl_new_struct_uninit_f], [dt])
     # set the fields
     for i in 2:length(args)
         rhs = codegen!(cg, args[i])  # need to box?
