@@ -1,17 +1,17 @@
 function emit_box!(cg::CodeCtx, v, t::LLVM.IntegerType)
     t == jl_value_t_ptr && return v
-    t == llvmtype(Int64) && return LLVM.call!(cg.builder, jl_box_int64_f, LLVM.Value[v])
-    t == llvmtype(Int8) && return LLVM.call!(cg.builder, jl_box_int8_f, LLVM.Value[v])
+    t == int64_t && return LLVM.call!(cg.builder, cg.extern[:jl_box_int64_f], LLVM.Value[v])
+    t == int8_t  && return LLVM.call!(cg.builder, cg.extern[:jl_box_int8_f], LLVM.Value[v])
     error("Boxing of $t not supported")
 end
 emit_box!(cg::CodeCtx, v, t::LLVM.PointerType) = v
 
 function emit_unbox!(cg::CodeCtx, v, ::Type{T}) where T
     t = LLVM.llvmtype(v) 
-    t == llvmtype(Int64) && return v
-    t == llvmtype(Int8) && return v
+    t == int64_t && return v
+    t == int8_t && return v
     if t == jl_value_t_ptr 
-        T == Int64 && return LLVM.call!(cg.builder, jl_unbox_int64_f, LLVM.Value[v])
+        T == Int64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int64_f], LLVM.Value[v])
     end
     error("Unboxing of $t not supported")
 end
@@ -41,27 +41,25 @@ function emit_builtin!(cg::CodeCtx, name, args)
         LLVM.store!(cg.builder, v, p)
     end
     println("Almost done")
-    func = builtins[name]
+    func = cg.builtin[name]
     x = codegen!(cg, 0)
     dumfunc = emit_box!(cg, x, LLVM.llvmtype(x)) ## Dummy to see if this gets stuff working
     return LLVM.call!(cg.builder, func, LLVM.Value[dumfunc, newargs, cgnargs])
     # error("Not supported, yet")
 end
 
-const builtins = Dict{Symbol, LLVM.Function}()
-
-function add_builtin_func(a, b)
-    func_type = LLVM.FunctionType(
-        jl_value_t_ptr, 
-        LLVMType[#=F=#     jl_value_t_ptr, 
-                 #=args=#  jl_value_t_ptr_ptr, 
-                 #=nargs=# llvmtype(UInt32)])
-    func = LLVM.Function(active_module, string(b), func_type)
-    LLVM.linkage!(func, LLVM.API.LLVMExternalLinkage)
-    builtins[Symbol(a)] = func
-end
-
-function setup_builtins()
+function setup_builtins!(cg::CodeCtx)
+    builtin = Dict{Symbol, LLVM.Function}()
+    function add_builtin_func(a, b)
+        func_type = LLVM.FunctionType(
+            jl_value_t_ptr, 
+            LLVMType[#=F=#     jl_value_t_ptr, 
+                     #=args=#  jl_value_t_ptr_ptr, 
+                     #=nargs=# uint32_t])
+        func = LLVM.Function(cg.mod, string(b), func_type)
+        LLVM.linkage!(func, LLVM.API.LLVMExternalLinkage)
+        builtin[Symbol(a)] = func
+    end
     add_builtin_func("===", :jl_f_is);
     add_builtin_func("typeof", :jl_f_typeof);
     add_builtin_func("sizeof", :jl_f_sizeof);
@@ -94,6 +92,6 @@ function setup_builtins()
     add_builtin_func("_apply_latest", :jl_f__apply_latest);
     add_builtin_func("_expr", :jl_f__expr);
     add_builtin_func("svec", :jl_f_svec);
-end
 
-setup_builtins()
+    return builtin
+end

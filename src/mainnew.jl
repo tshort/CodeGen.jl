@@ -3,25 +3,35 @@ abstract type AbstractCodeCtx end
 
 mutable struct CodeCtx <: AbstractCodeCtx
     builder::LLVM.Builder
+    mod::LLVM.Module
     code_info::CodeInfo
     result_type::DataType
     name::String
     argtypes
     nargs::Int
     func::LLVM.Function
+    extern::Dict{Symbol, Any}
+    builtin::Dict{Symbol, LLVM.Function}
     current_scope::CurrentScope
     slots::Vector{LLVM.Value}
     ssas::Dict{Int, LLVM.Value}
     meta::Dict{Symbol, Any}
     labels::Dict{Int, Any}
-    CodeCtx(ci::CodeInfo, result_type::DataType, name, argtypes) = 
+    CodeCtx(mod::LLVM.Module, ci::CodeInfo, result_type::DataType, name, argtypes) = 
         new(LLVM.Builder(ctx),
+            mod, 
             ci,
             result_type,
             name,
             argtypes,
             length(argtypes.parameters))
 end
+
+CodeCtx(ci::CodeInfo, result_type::DataType, name, argtypes) =
+    CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), ci, result_type, name, argtypes)
+
+CodeCtx(cg::CodeCtx, ci::CodeInfo, result_type::DataType, name, argtypes) =
+    CodeCtx(cg.mod, ci, result_type, name, argtypes)
 
 Base.show(io::IO, cg::CodeCtx) = print(io, "CodeCtx")
 
@@ -62,13 +72,15 @@ function codegen!(cg::CodeCtx)
     ci = cg.code_info
     argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
     func_type = LLVM.FunctionType(llvmtype(cg.result_type), argtypes)
-    cg.func = LLVM.Function(active_module, cg.name, func_type)
+    cg.func = LLVM.Function(cg.mod, cg.name, func_type)
     cg.slots = Vector{LLVM.Value}(length(ci.slotnames))
     cg.ssas = Dict{Int, LLVM.Value}()
     cg.labels = Dict{Int, Any}()
     cg.nargs = length(argtypes)
     cg.current_scope = CurrentScope()
     LLVM.linkage!(cg.func, LLVM.API.LLVMExternalLinkage)
+    cg.builtin = setup_builtins!(cg)
+    cg.extern = setup_externs!(cg.mod)
     entry = LLVM.BasicBlock(cg.func, "entry", ctx)
     LLVM.position!(cg.builder, entry)
     for (i, param) in enumerate(LLVM.parameters(cg.func))
@@ -89,7 +101,7 @@ function codegen!(cg::CodeCtx)
     end
     # LLVM.verify(func)
     # LLVM.dispose(cg.builder)  # ?? something different for multiple funs 
-    return active_module
+    return cg.mod
 end
 
 #
@@ -130,7 +142,7 @@ function codegen!(cg::CodeCtx, ::Val{:(=)}, args)
 end
 
 function codegen!(cg::CodeCtx, f::GlobalRef) 
-    return LLVM.functions(active_module)[string(args[2])]
+    return LLVM.functions(cg.mod)[string(args[2])]
 end
 
 
@@ -161,14 +173,14 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args)
     name = string(args[2])
     println("Invoking...")
     @show name
-    if haskey(LLVM.functions(active_module), name)
-        func = LLVM.functions(active_module)[name]
+    if haskey(LLVM.functions(cg.mod), name)
+        func = LLVM.functions(cg.mod)[name]
     else
         argtypes = Tuple{args[1].specTypes.parameters[2:end]...}
         fun = eval(args[2])
         ci, dt = code_typed(fun, argtypes, optimize = true)[1]
         dump(ci)
-        newcg = CodeCtx(ci, dt, name, argtypes)
+        newcg = CodeCtx(cg, ci, dt, name, argtypes)
         codegen!(newcg)
         func = newcg.func
     end
@@ -202,7 +214,7 @@ codegen!(cg::CodeCtx, x::T) where T <: Base.BitInteger =
     LLVM.ConstantInt(llvmtype(T), x)
 
 codegen!(cg::CodeCtx, x::Bool) =
-    LLVM.ConstantInt(llvmtype(Bool), Int8(x))
+    LLVM.ConstantInt(bool_t, Int8(x))
 
 # I'm not sure these are appropriate:
 # codegen!(cg::CodeCtx, ::Type{T}) where T <: Base.IEEEFloat =
@@ -213,9 +225,9 @@ codegen!(cg::CodeCtx, x::Bool) =
 
 # The following would need to create the appropriate structures in memory
 function codegen!(cg::CodeCtx, ::Type{Array{T,N}}) where {T,N}
-    typ = LLVM.load!(cg.builder, jl_array_type_g)
+    typ = LLVM.load!(cg.builder, cg.extern[:jl_array_type_g])
     # bctyp = LLVM.bitcast!(cg.builder, typ, jl_value_t_ptr)
-    return LLVM.call!(cg.builder, jl_apply_array_type_f, LLVM.Value[typ, codegen!(cg, UInt32(N))])
+    return LLVM.call!(cg.builder, cg.extern[:jl_apply_array_type_f], LLVM.Value[typ, codegen!(cg, UInt32(N))])
     # arraytype = codegen!(cg, Val(:extcall), "jl_apply_array_type", Any, [T, N])
 end
 #   %9 = load %struct._jl_datatype_t*, %struct._jl_datatype_t** @jl_float64_type, align 8
@@ -249,7 +261,7 @@ function codegen!(cg::CodeCtx, ::Val{:foreigncall}, args)
     end
     
     func_type = LLVM.FunctionType(llvmtype(args[2]), llvmtype.(collect(args[3])))
-    func = LLVM.Function(active_module, name, func_type)
+    func = LLVM.Function(cg.mod, name, func_type)
     LLVM.linkage!(func, LLVM.API.LLVMExternalLinkage)
 
     return LLVM.call!(cg.builder, func, llvmargs)
@@ -264,7 +276,7 @@ function codegen!(cg::CodeCtx, ::Val{:extcall}, name, rettype, args)
     end
     
     func_type = LLVM.FunctionType(llvmtype(rettype), llvmargtypes)
-    func = LLVM.Function(active_module, name, func_type)
+    func = LLVM.Function(cg.mod, name, func_type)
     LLVM.linkage!(func, LLVM.API.LLVMExternalLinkage)
 
     return LLVM.call!(cg.builder, func, llvmargs)
@@ -309,12 +321,12 @@ end
 #
 function codegen!(cg::CodeCtx, ::Val{:new}, args)
     typ = LLVM.GenericValue(Ptr{DataType}(pointer_from_objref(eval(args[1]))))
-    res = LLVM.call!(cg.builder, jl_new_struct_uninit_f, LLVM.Value[typ])
+    res = LLVM.call!(cg.builder, cg.extern[:jl_new_struct_uninit_f], LLVM.Value[typ])
     # set the fields
     for i in 2:length(args)
         rhs = codegen!(cg, args[i])  # need to box?
         offset = codegen!(cg, UInt32(i - 1))
-        LLVM.call!(cg.builder, jl_set_nth_field_f, LLVM.Value[res, offset, rhs])
+        LLVM.call!(cg.builder, cg.extern[:jl_set_nth_field_f], LLVM.Value[res, offset, rhs])
     end
     return res
 end
