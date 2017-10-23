@@ -8,11 +8,13 @@ emit_box!(cg::CodeCtx, v, t::LLVM.PointerType) = v
 
 function emit_unbox!(cg::CodeCtx, v, ::Type{T}) where T
     t = LLVM.llvmtype(v) 
+    @show t, T
     t == int64_t && return v
     t == int8_t && return v
     if t == jl_value_t_ptr 
         T == Int64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int64_f], LLVM.Value[v])
     end
+    return v
     error("Unboxing of $t not supported")
 end
 
@@ -27,20 +29,16 @@ function emit_builtin!(cg::CodeCtx, name, args)
             # end
         # end
     end 
-    @show name nargs
     # Otherwise default to the C++ versions of these.
     # BROKEN
     # need to create an array in llvm
     cgnargs = codegen!(cg, UInt32(nargs))
     newargs = LLVM.array_alloca!(cg.builder, jl_value_t_ptr, cgnargs)
     for i in 1:nargs
-        @show i, args[i]
-        @show LLVM.llvmtype(args[i])
         v = emit_box!(cg, args[i], LLVM.llvmtype(args[i]))
         p = LLVM.gep!(cg.builder, newargs, [codegen!(cg, i-1)])
         LLVM.store!(cg.builder, v, p)
     end
-    println("Almost done")
     func = cg.builtin[name]
     x = codegen!(cg, 0)
     dumfunc = emit_box!(cg, x, LLVM.llvmtype(x)) ## Dummy to see if this gets stuff working
