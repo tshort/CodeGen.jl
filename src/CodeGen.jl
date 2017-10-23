@@ -7,7 +7,7 @@ using LLVM
 
 include("init.jl")
 include("scope.jl")
-include("mainnew.jl")
+include("main.jl")
 include("intrinsics.jl")
 include("builtins.jl")
 

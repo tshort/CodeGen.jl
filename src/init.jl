@@ -9,7 +9,7 @@ llvmtype(x) =
     
 
 const bool_t  = llvmtype(Bool)
-const int1_t  = LLVM.IntType(1)
+const int1_t  = LLVM.Int1Type(ctx)
 const int8_t  = llvmtype(Int8)
 const int16_t = llvmtype(Int16)
 const int32_t = llvmtype(Int32)
@@ -204,7 +204,6 @@ has_terminator(bb::BasicBlock) =
 # DataType
 #
 function get_and_emit_datatype!(cg, name)
-    @show name
     if haskey(cg.datatype, name) 
         return cg.datatype[name]
     end
