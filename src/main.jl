@@ -1,24 +1,28 @@
 
 abstract type AbstractCodeCtx end
 
+"""
+The `CodeCtx` type holds the main state for code generation. 
+One instance is used per function being compiled.
+"""
 mutable struct CodeCtx <: AbstractCodeCtx
     builder::LLVM.Builder
     mod::LLVM.Module
     code_info::CodeInfo
-    result_type::DataType
+    result_type
     name::String
     argtypes
     nargs::Int
     func::LLVM.Function
     extern::Dict{Symbol, Any}
     builtin::Dict{Symbol, LLVM.Function}
-    datatype::Dict{Symbol, Any}
+    datatype::Dict{Type, Any}
     current_scope::CurrentScope
     slots::Vector{LLVM.Value}
     ssas::Dict{Int, LLVM.Value}
     meta::Dict{Symbol, Any}
     labels::Dict{Int, Any}
-    CodeCtx(mod::LLVM.Module, ci::CodeInfo, result_type::DataType, name, argtypes) = 
+    CodeCtx(mod::LLVM.Module, ci::CodeInfo, result_type, name, argtypes) = 
         new(LLVM.Builder(ctx),
             mod, 
             ci,
@@ -28,13 +32,13 @@ mutable struct CodeCtx <: AbstractCodeCtx
             length(argtypes.parameters))
 end
 
-function CodeCtx(ci::CodeInfo, result_type::DataType, name, argtypes)
+function CodeCtx(ci::CodeInfo, result_type, name, argtypes; triple = nothing, datalayout = nothing)
     cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), ci, result_type, name, argtypes)
-    global M = cg.mod
+    # triple == nothing && triple!(cg.mod, "wasm32-unknown-unknown")
+    # datalayout == nothing && datalayout!(cg.mod, "e-m:e-p:32:32-i64:64-n32:64-S128")
     cg.builtin = setup_builtins!(cg)
     cg.extern = setup_externs!(cg.mod)
     cg.datatype = setup_types!(cg)
-    global D = cg.datatype
     cg.slots = Vector{LLVM.Value}(length(ci.slotnames))
     cg.ssas = Dict{Int, LLVM.Value}()
     cg.labels = Dict{Int, Any}()
@@ -42,7 +46,7 @@ function CodeCtx(ci::CodeInfo, result_type::DataType, name, argtypes)
     return cg
 end
 
-function CodeCtx(orig_cg::CodeCtx, ci::CodeInfo, result_type::DataType, name, argtypes)
+function CodeCtx(orig_cg::CodeCtx, ci::CodeInfo, result_type, name, argtypes)
     cg = CodeCtx(orig_cg.mod, ci, result_type, name, argtypes)
     cg.builtin = orig_cg.builtin
     cg.extern = orig_cg.extern
@@ -78,7 +82,22 @@ function create_entry_block_allocation(cg::CodeCtx, fn::LLVM.Function, typ, varn
     return alloc
 end
 
+"""
+    codegen(fun, argtypes; optimize_lowering = true) 
 
+Return the bitcode for `fun` with argument types `argtypes`. 
+`argtypes` is a tuple type (e.g. `Tuple{Float64, Int}`).
+
+The optional argument `optimize_lowering` determines whether 
+`code_typed` uses optimization when infering types.
+
+`codegen` creates a `CodeCtx` and runs `codegen!(cg)`. 
+Direct calls to that can be done for more flexibility.
+
+The return value is an LLVM module. This can be written to a bitcode 
+files with `write(mod, filepath)`. It can be optimized with
+`optimize!(mod)`.
+"""
 function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     funname = string(Base.function_name(fun)) # good link: typeof(f).name.mt.name; https://stackoverflow.com/questions/38819327/given-a-function-object-how-do-i-find-its-name-and-module
@@ -89,6 +108,13 @@ end
 #
 # Main entry
 #
+
+"""
+    codegen!(cg::CodeCtx)
+    codegen!(cg::CodeCtx, ...)
+
+This is the main function for dispatching various types of code generation.
+"""
 function codegen!(cg::CodeCtx)
     ci = cg.code_info
     argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
@@ -150,13 +176,11 @@ function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
         varname = string(cg.code_info.slotnames[args[1].id])
         V = get(current_scope(cg), varname, nothing)
         V == nothing && error("unknown variable name $(varname)")
-        @show LLVM.llvmtype(result)
         if LLVM.llvmtype(result) == int1_t 
-            println("*****HERE*******")
             result = LLVM.zext!(cg.builder, result, int8_t)
         end
+        ## TODO: review this; seems off
         LLVM.store!(cg.builder, result, V)
-        # LLVM.name!(result, varname)
         unboxed_result = emit_unbox!(cg, result, typ)
         cg.slots[args[1].id] = unboxed_result
         return unboxed_result
@@ -172,12 +196,11 @@ function codegen!(cg::CodeCtx, f::GlobalRef)
     if haskey(LLVM.functions(cg.mod), string(f.name))
         return LLVM.functions(cg.mod)[string(f.name)]
     end
-    return codegen!(cg, Int32(0)) # BROKEN
+    return emit_box!(cg, Int32(0)) # BROKEN
 end
 
 function codegen!(cg::CodeCtx, x::QuoteNode) 
-    return codegen!(cg, Int32(0)) # BROKEN
-    # return codegen!(cg, x.value) 
+    return emit_box!(cg, Int32(0)) # BROKEN
 end
 
 
@@ -186,15 +209,13 @@ end
 #
 function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     llvmargs = LLVM.Value[]
-    for v in args[2:end]
-        push!(llvmargs, codegen!(cg, v))
-    end
+    llvmargs = Any[]
     fun = eval(args[1])
     if isa(fun, Core.IntrinsicFunction)
-        return emit_intrinsic!(cg, args[1].name, llvmargs)
+        return emit_intrinsic!(cg, args[1].name, args[2:end])
     end
     if isa(fun, Core.Builtin)
-        return emit_unbox!(cg, emit_builtin!(cg, args[1].name, llvmargs), typ)
+        return emit_unbox!(cg, emit_builtin!(cg, args[1].name, args[2:end]), typ)
     end
     name = string(args[1])
     error("Function $name not supported.")
@@ -253,25 +274,17 @@ function codegen!(cg::CodeCtx, s::String)
 end
 
 # I'm not sure these are appropriate:
-# codegen!(cg::CodeCtx, ::Type{T}) where T <: Base.IEEEFloat =
-#     llvmtype(T)
+codegen!(cg::CodeCtx, ::Type{T}) where T <: Base.IEEEFloat =
+    llvmtype(T)
 
-# codegen!(cg::CodeCtx, ::Type{T}) where T <: Base.BitInteger =
-#     llvmtype(T)
+codegen!(cg::CodeCtx, ::Type{T}) where T <: Base.BitInteger =
+    llvmtype(T)
 
-# The following would need to create the appropriate structures in memory
+# The following creates the appropriate structures in memory
 function codegen!(cg::CodeCtx, ::Type{Array{T,N}}) where {T,N}
-    typ = LLVM.load!(cg.builder, cg.extern[:jl_array_type_g])
-    # bctyp = LLVM.bitcast!(cg.builder, typ, jl_value_t_ptr)
+    typ = LLVM.load!(cg.builder, cg.datatype[T])
     return LLVM.call!(cg.builder, cg.extern[:jl_apply_array_type_f], LLVM.Value[typ, codegen!(cg, UInt32(N))])
-    # arraytype = codegen!(cg, Val(:extcall), "jl_apply_array_type", Any, [T, N])
 end
-#   %9 = load %struct._jl_datatype_t*, %struct._jl_datatype_t** @jl_float64_type, align 8
-#   %10 = bitcast %struct._jl_datatype_t* %9 to %struct._jl_value_t*
-#   %11 = call %struct._jl_value_t* @jl_apply_array_type(%struct._jl_value_t* %10, i64 1)
-
-# codegen!(cg::CodeCtx, s::String) where T = ??
-# use jl_cstr_to_string or jl_pchar_to_string
 
 #
 # Miscellaneous
@@ -317,10 +330,10 @@ function codegen!(cg::CodeCtx, ::Val{:extcall}, name, rettype, args)
 
     return LLVM.call!(cg.builder, func, llvmargs)
 end
+
 #
 # Control flow
 #
-
 function codegen!(cg::CodeCtx, ln::LabelNode)
     if !haskey(cg.labels, ln.label)
         func = LLVM.parent(LLVM.position(cg.builder))

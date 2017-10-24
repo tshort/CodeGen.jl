@@ -1,7 +1,7 @@
 
 module CodeGen
 
-export codegen!, codegen
+export codegen, codegen!
 
 using LLVM
 
@@ -10,5 +10,6 @@ include("scope.jl")
 include("main.jl")
 include("intrinsics.jl")
 include("builtins.jl")
+include("run.jl")
 
 end # module

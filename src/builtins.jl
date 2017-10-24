@@ -1,47 +1,80 @@
-function emit_box!(cg::CodeCtx, v, t::LLVM.IntegerType)
-    t == jl_value_t_ptr && return v
-    t == int64_t && return LLVM.call!(cg.builder, cg.extern[:jl_box_int64_f], LLVM.Value[v])
-    t == int8_t  && return LLVM.call!(cg.builder, cg.extern[:jl_box_int8_f], LLVM.Value[v])
-    error("Boxing of $t not supported")
+#
+# Code generation for builtin functions and for boxing and unboxing.
+# 
+
+emit_box!(cg::CodeCtx, ::Type{Any}, v) = v
+
+emit_box!(cg::CodeCtx, ::Type{Bool}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_bool_f], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Int32}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int32_f], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Int64}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int64_f], LLVM.Value[v])
+
+function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
+    v = codegen!(cg, x)
+    T == Any && return v
+    T <: Base.BitInteger && return emit_box!(cg, T, v)
+    T <: Base.IEEEFloat  && return emit_box!(cg, T, v)
+    T == Bool            && return emit_box!(cg, T, v)
+    if T == SlotNumber 
+        slottype = cg.code_info.slottypes[x.id]
+        if isbits(slottype) 
+            return emit_box!(cg, slottype, v)
+        else
+            return v
+        end
+    end
+    if T == SSAValue
+        ssatype = cg.code_info.ssavaluetypes[x.id]
+        if isbits(eltype(ssatype)) # This eltype seems wrong. I don't understand ssavaluetypes.
+            return emit_box!(cg, eltype(ssatype), v) 
+        else
+            return v
+        end
+    end
+    if T == Expr
+        if isbits(x.typ) 
+            return emit_box!(cg, x.typ, v)
+        else
+            return v
+        end
+    end
+    error("Boxing of $T not supported")
+    return v
 end
-emit_box!(cg::CodeCtx, v, t::LLVM.PointerType) = v
+# emit_box!(cg::CodeCtx, v, t::LLVM.PointerType) = v
 
 function emit_unbox!(cg::CodeCtx, v, ::Type{T}) where T
     t = LLVM.llvmtype(v) 
     t == int64_t && return v
+    t == int32_t && return v
     t == int8_t && return v
     if t == jl_value_t_ptr 
-        T == Int64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int64_f], LLVM.Value[v])
+        T == Int32 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int32_f], LLVM.Value[v])
     end
     return v
     error("Unboxing of $t not supported")
 end
 
 
-function emit_builtin!(cg::CodeCtx, name, args)
-    nargs = length(args)
+function emit_builtin!(cg::CodeCtx, name, jlargs)
+    nargs = length(jlargs)
     if name == :(===) && nargs == 2
         # if isbits(args[1]) && typeof(args[1]) == typeof(args[2])
             # if isa(args[1], Integer)
                 # Need to box result?
-                return emit_intrinsic!(cg, :eq_int, args)
+                return emit_intrinsic!(cg, :eq_int, jlargs)
             # end
         # end
     end 
     # Otherwise default to the C++ versions of these.
-    # BROKEN
-    # need to create an array in llvm
     cgnargs = codegen!(cg, UInt32(nargs))
     newargs = LLVM.array_alloca!(cg.builder, jl_value_t_ptr, cgnargs)
     for i in 1:nargs
-        v = emit_box!(cg, args[i], LLVM.llvmtype(args[i]))
+        v = emit_box!(cg, jlargs[i])
         p = LLVM.gep!(cg.builder, newargs, [codegen!(cg, i-1)])
         LLVM.store!(cg.builder, v, p)
     end
     func = cg.builtin[name]
-    x = codegen!(cg, 0)
-    dumfunc = emit_box!(cg, x, LLVM.llvmtype(x)) ## Dummy to see if this gets stuff working
-    return LLVM.call!(cg.builder, func, LLVM.Value[dumfunc, newargs, cgnargs])
+    return LLVM.call!(cg.builder, func, LLVM.Value[emit_box!(cg, Int32(0)), newargs, cgnargs])
     # error("Not supported, yet")
 end
 

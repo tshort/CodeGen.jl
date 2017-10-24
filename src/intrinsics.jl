@@ -1,5 +1,12 @@
+#
+# Code generation for intrinsic functions.
+# 
 
-function emit_intrinsic!(cg::CodeCtx, name, args)
+function emit_intrinsic!(cg::CodeCtx, name, jlargs)
+    args = LLVM.Value[]
+    for v in jlargs
+        push!(args, codegen!(cg, v))
+    end
     name == :neg_int  && return LLVM.neg!(cg.builder, args[1])
     name == :add_int  && return LLVM.add!(cg.builder, args[1], args[2])
     name == :sub_int  && return LLVM.sub!(cg.builder, args[1], args[2])
