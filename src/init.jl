@@ -78,7 +78,7 @@ function extern!(mod, name, rettyp, argtypes)
 end
 
 function setup_externs!(mod)
-    global e = Dict{Symbol, Any}()
+    e = Dict{Symbol, Any}()
     #
     # Global variables, not including type definitions
     # 

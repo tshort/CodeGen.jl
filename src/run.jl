@@ -40,8 +40,8 @@ function LLVM.run(mod::LLVM.Module, fun::String, restype, args...)
             error("did not find $fun function in module")
         end
         f = LLVM.functions(engine)[fun]
-        global llvmargs = [LLVM.GenericValue(llvmtype(typeof(a)), a) for a in args]
-        global res = LLVM.run(engine, f, llvmargs)
+        llvmargs = [LLVM.GenericValue(llvmtype(typeof(a)), a) for a in args]
+        res = LLVM.run(engine, f, llvmargs)
         res_jl = convert(restype, res)
         # LLVM.dispose(res)
     end

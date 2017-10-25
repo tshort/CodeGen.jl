@@ -196,7 +196,12 @@ function codegen!(cg::CodeCtx, f::GlobalRef)
     if haskey(LLVM.functions(cg.mod), string(f.name))
         return LLVM.functions(cg.mod)[string(f.name)]
     end
-    return emit_box!(cg, Int32(0)) # BROKEN
+    evf = eval(f)
+    if isa(evf, Type)
+        return codegen!(cg, evf)
+    else
+        return emit_box!(cg, Int32(0)) # KLUDGE
+    end
 end
 
 function codegen!(cg::CodeCtx, x::QuoteNode) 
