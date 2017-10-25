@@ -5,8 +5,12 @@
 emit_box!(cg::CodeCtx, ::Type{Any}, v) = v
 
 emit_box!(cg::CodeCtx, ::Type{Bool}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_bool_f], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Int8}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_int8_f], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Int16}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int16_f], LLVM.Value[v])
 emit_box!(cg::CodeCtx, ::Type{Int32}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int32_f], LLVM.Value[v])
 emit_box!(cg::CodeCtx, ::Type{Int64}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int64_f], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Float32}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_float32_f], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Float64}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_float64_f], LLVM.Value[v])
 
 function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
     v = codegen!(cg, x)
@@ -44,14 +48,16 @@ end
 
 function emit_unbox!(cg::CodeCtx, v, ::Type{T}) where T
     t = LLVM.llvmtype(v) 
-    t == int64_t && return v
-    t == int32_t && return v
-    t == int8_t && return v
     if t == jl_value_t_ptr 
+        T == Bool  && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_bool_f], LLVM.Value[v])
+        T == Int8  && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int8_f], LLVM.Value[v])
+        T == Int16 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int16_f], LLVM.Value[v])
         T == Int32 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int32_f], LLVM.Value[v])
+        T == Int64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int64_f], LLVM.Value[v])
+        T == Float32 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_float32_f], LLVM.Value[v])
+        T == Float64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_float64_f], LLVM.Value[v])
     end
     return v
-    error("Unboxing of $t not supported")
 end
 
 

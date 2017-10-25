@@ -87,13 +87,14 @@ function setup_externs!(mod)
     #
     # Functions
     # 
-    e[:jl_box_int64_f] = extern!(mod, "jl_box_int64", jl_value_t_ptr, LLVMType[uint64_t])
-    e[:jl_box_int32_f] = extern!(mod, "jl_box_int32", jl_value_t_ptr, LLVMType[uint32_t])
-    e[:jl_box_int8_f] = extern!(mod, "jl_box_int8", jl_value_t_ptr, LLVMType[uint8_t])
-    e[:jl_box_bool_f] = extern!(mod, "jl_box_bool", jl_value_t_ptr, LLVMType[uint8_t])
-    
-    e[:jl_unbox_int64_f] = extern!(mod, "jl_unbox_int64", uint64_t, LLVMType[jl_value_t_ptr])
-    e[:jl_unbox_int32_f] = extern!(mod, "jl_unbox_int32", uint32_t, LLVMType[jl_value_t_ptr])
+    for s in [:int64, :int32, :int16, :int8, :int64, :int32, :int16, :int8, :float64, :float32]
+        #e[:jl_box_int64_f] = extern!(mod, "jl_box_int64", jl_value_t_ptr, LLVMType[int64_t])
+        e[Symbol(:jl_box_, s, :_f)] = extern!(mod, "jl_box_$s", jl_value_t_ptr, LLVMType[eval(Symbol(s, :_t))])
+        # e[:jl_unbox_int64_f] = extern!(mod, "jl_unbox_int64", int64_t, LLVMType[jl_value_t_ptr])
+        e[Symbol(:jl_unbox_, s, :_f)] = extern!(mod, "jl_unbox_$s", eval(Symbol(s, :_t)), LLVMType[jl_value_t_ptr])
+    end
+    e[:jl_box_bool_f]  = extern!(mod, "jl_box_bool", jl_value_t_ptr, LLVMType[uint8_t])
+    e[:jl_unbox_bool_f]  = extern!(mod, "jl_unbox_bool", uint8_t, LLVMType[jl_value_t_ptr])
     
     e[:jl_apply_array_type_f] = extern!(mod, "jl_apply_array_type", jl_value_t_ptr, LLVMType[jl_value_t_ptr, int32_t])
     e[:jl_new_struct_uninit_f] = extern!(mod, "jl_new_struct_uninit", jl_value_t_ptr, LLVMType[jl_datatype_t_ptr])
@@ -250,6 +251,8 @@ function get_and_emit_datatype!(cg, name)
     if haskey(cg.datatype, jtype)
         return cg.datatype[jtype]
     end
+    @show jtype
+    @show cg.datatype
     error("Not supported, yet")
     ## Everything past here is broken
         # JL_DLLEXPORT jl_datatype_t_ptr jl_new_datatype(jl_sym_t_ptr name,
