@@ -3,7 +3,7 @@
 # 
 
 function emit_intrinsic!(cg::CodeCtx, name, jlargs)
-    args = LLVM.Value[]
+    args = Any[]
     for v in jlargs
         push!(args, codegen!(cg, v))
     end
