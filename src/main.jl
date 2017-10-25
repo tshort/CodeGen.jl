@@ -13,23 +13,29 @@ mutable struct CodeCtx <: AbstractCodeCtx
     name::String
     argtypes
     nargs::Int
+    current_scope::CurrentScope
+    slots::Vector{LLVM.Value}
+    ssas::Dict{Int, LLVM.Value}
+    labels::Dict{Int, Any}
+    meta::Dict{Symbol, Any}
     func::LLVM.Function
     extern::Dict{Symbol, Any}
     builtin::Dict{Symbol, LLVM.Function}
     datatype::Dict{Type, Any}
-    current_scope::CurrentScope
-    slots::Vector{LLVM.Value}
-    ssas::Dict{Int, LLVM.Value}
-    meta::Dict{Symbol, Any}
-    labels::Dict{Int, Any}
-    CodeCtx(mod::LLVM.Module, ci::CodeInfo, result_type, name, argtypes) = 
+   CodeCtx(mod::LLVM.Module, ci::CodeInfo, result_type, name, argtypes) = 
         new(LLVM.Builder(ctx),
             mod, 
             ci,
             result_type,
             name,
             argtypes,
-            length(argtypes.parameters))
+            length(argtypes.parameters),
+            CurrentScope(),
+            Vector{LLVM.Value}(length(ci.slotnames)),
+            Dict{Int, LLVM.Value}(),
+            Dict{Int, Any}(),
+            Dict{Symbol, Any}()
+            )
 end
 
 function CodeCtx(ci::CodeInfo, result_type, name, argtypes; triple = nothing, datalayout = nothing)
@@ -39,10 +45,6 @@ function CodeCtx(ci::CodeInfo, result_type, name, argtypes; triple = nothing, da
     cg.builtin = setup_builtins!(cg)
     cg.extern = setup_externs!(cg.mod)
     cg.datatype = setup_types!(cg)
-    cg.slots = Vector{LLVM.Value}(length(ci.slotnames))
-    cg.ssas = Dict{Int, LLVM.Value}()
-    cg.labels = Dict{Int, Any}()
-    cg.current_scope = CurrentScope()
     return cg
 end
 
@@ -51,10 +53,6 @@ function CodeCtx(orig_cg::CodeCtx, ci::CodeInfo, result_type, name, argtypes)
     cg.builtin = orig_cg.builtin
     cg.extern = orig_cg.extern
     cg.datatype = orig_cg.datatype
-    cg.slots = Vector{LLVM.Value}(length(ci.slotnames))
-    cg.ssas = Dict{Int, LLVM.Value}()
-    cg.labels = Dict{Int, Any}()
-    cg.current_scope = CurrentScope()
     return cg
 end
 
