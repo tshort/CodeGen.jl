@@ -263,7 +263,6 @@ end
 
 function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
     if length(args) == 1 && args[1] != nothing
-        @show args[1]
         res = codegen!(cg, args[1])
         if LLVM.llvmtype(res) != llvmtype(cg.result_type)
             res = emit_unbox!(cg, res, cg.result_type)
