@@ -1,5 +1,4 @@
-#
-# Sets up global values for LLVM types, Julia types, external declarations, and other utilities.
+# # Sets up global values for LLVM types, Julia types, external declarations, and other utilities.
 # 
 
 # const ctx = LLVM.Context(convert(LLVM.API.LLVMContextRef, cglobal(:jl_LLVMContext, Void)))
@@ -28,6 +27,7 @@ const jl_unionall_t_ptr = jl_value_t_ptr
 const jl_typename_t_ptr = jl_value_t_ptr 
 const jl_sym_t_ptr = jl_value_t_ptr 
 const jl_svec_t_ptr = jl_value_t_ptr 
+const jl_module_t_ptr = jl_value_t_ptr 
 
 const tmap = Dict{Type,LLVM.LLVMType}(
     Void    => LLVM.VoidType(ctx),
@@ -61,6 +61,7 @@ const double_t = llvmtype(Float64)
 const float32_t = llvmtype(Float32)
 const float64_t = llvmtype(Float64)
 const void_t    = llvmtype(Void)
+const size_t    = llvmtype(Int)
 
 const int8_t_ptr  = LLVM.PointerType(int8_t)
 
@@ -71,8 +72,8 @@ function extern_global!(mod, name, typ)
     return res
 end
 
-function extern!(mod, name, rettyp, argtypes)
-    res = LLVM.Function(mod, string(name), LLVM.FunctionType(rettyp, argtypes))
+function extern!(mod, name, rettyp, argtypes; vararg = false)
+    res = LLVM.Function(mod, string(name), LLVM.FunctionType(rettyp, argtypes, vararg))
     LLVM.linkage!(res, LLVM.API.LLVMExternalLinkage)
     return res
 end
@@ -83,23 +84,33 @@ function setup_externs!(mod)
     # Global variables, not including type definitions
     # 
 
+    e[:jl_main_module_g] = extern_global!(mod, "jl_main_module", jl_module_t_ptr)
 
     #
     # Functions
     # 
     for s in [:int64, :int32, :int16, :int8, :uint64, :uint32, :uint16, :uint8, :float64, :float32]
-        #e[:jl_box_int64_f] = extern!(mod, "jl_box_int64", jl_value_t_ptr, LLVMType[int64_t])
-        e[Symbol(:jl_box_, s, :_f)] = extern!(mod, "jl_box_$s", jl_value_t_ptr, LLVMType[eval(Symbol(s, :_t))])
-        # e[:jl_unbox_int64_f] = extern!(mod, "jl_unbox_int64", int64_t, LLVMType[jl_value_t_ptr])
-        e[Symbol(:jl_unbox_, s, :_f)] = extern!(mod, "jl_unbox_$s", eval(Symbol(s, :_t)), LLVMType[jl_value_t_ptr])
+        #e[:jl_box_int64] = extern!(mod, "jl_box_int64", jl_value_t_ptr, LLVMType[int64_t])
+        e[Symbol(:jl_box_, s)] = extern!(mod, "jl_box_$s", jl_value_t_ptr, LLVMType[eval(Symbol(s, :_t))])
+        # e[:jl_unbox_int64] = extern!(mod, "jl_unbox_int64", int64_t, LLVMType[jl_value_t_ptr])
+        e[Symbol(:jl_unbox_, s)] = extern!(mod, "jl_unbox_$s", eval(Symbol(s, :_t)), LLVMType[jl_value_t_ptr])
     end
-    e[:jl_box_bool_f]  = extern!(mod, "jl_box_bool", jl_value_t_ptr, LLVMType[uint8_t])
-    e[:jl_unbox_bool_f]  = extern!(mod, "jl_unbox_bool", uint8_t, LLVMType[jl_value_t_ptr])
+    e[:jl_box_bool]  = extern!(mod, "jl_box_bool", jl_value_t_ptr, LLVMType[uint8_t])
+    e[:jl_unbox_bool]  = extern!(mod, "jl_unbox_bool", uint8_t, LLVMType[jl_value_t_ptr])
+    e[:jl_box_ssavalue]  = extern!(mod, "jl_ssavalue", jl_value_t_ptr, LLVMType[size_t])
+    e[:jl_box_slotnumber]  = extern!(mod, "jl_slotnumber", jl_value_t_ptr, LLVMType[size_t])
     
-    e[:jl_apply_array_type_f] = extern!(mod, "jl_apply_array_type", jl_value_t_ptr, LLVMType[jl_value_t_ptr, int32_t])
-    e[:jl_new_struct_uninit_f] = extern!(mod, "jl_new_struct_uninit", jl_value_t_ptr, LLVMType[jl_datatype_t_ptr])
-    e[:jl_set_nth_field_f] = extern!(mod, "jl_set_nth_field", void_t, LLVMType[jl_value_t_ptr, int32_t, jl_value_t_ptr])
-    e[:jl_pchar_to_string_f] = extern!(mod, "jl_pchar_to_string", jl_value_t_ptr, LLVMType[int8_t_ptr, uint32_t])
+    e[:jl_apply_array_type] = extern!(mod, "jl_apply_array_type", jl_value_t_ptr, LLVMType[jl_value_t_ptr, int32_t])
+    e[:jl_new_struct_uninit] = extern!(mod, "jl_new_struct_uninit", jl_value_t_ptr, LLVMType[jl_datatype_t_ptr])
+    e[:jl_set_nth_field] = extern!(mod, "jl_set_nth_field", void_t, LLVMType[jl_value_t_ptr, int32_t, jl_value_t_ptr])
+    e[:jl_pchar_to_string] = extern!(mod, "jl_pchar_to_string", jl_value_t_ptr, LLVMType[int8_t_ptr, uint32_t])
+    
+    e[:jl_symbol] = extern!(mod, "jl_symbol", jl_sym_t_ptr, LLVMType[int8_t_ptr])
+    e[:jl_svec] = extern!(mod, "jl_svec", jl_svec_t_ptr, LLVMType[], vararg = true)
+    e[:jl_new_datatype] = extern!(mod, "jl_new_datatype", jl_datatype_t_ptr, 
+        LLVMType[jl_sym_t_ptr, jl_module_t_ptr, jl_datatype_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, int32_t, int32_t, int32_t])
+    e[:jl_new_abstracttype] = extern!(mod, "jl_new_abstracttype", jl_datatype_t_ptr, 
+        LLVMType[jl_sym_t_ptr, jl_module_t_ptr, jl_datatype_t_ptr, jl_svec_t_ptr])
 
     return e
 end
@@ -245,37 +256,40 @@ has_terminator(bb::BasicBlock) =
 #
 # DataType - emit and return a stored type or create a new type and store it
 #
-function get_and_emit_datatype!(cg, name)
-    jtype = eval(name)
+function get_and_emit_datatype!(cg, jtype)
+
+    if isa(jtype, GlobalRef)
+        jtype = eval(jtype)
+    end
     if haskey(cg.datatype, jtype)
         return cg.datatype[jtype]
     end
-    @show jtype
-    @show cg.datatype
-    error("Not supported, yet")
-    ## Everything past here is unfinished
-        # JL_DLLEXPORT jl_datatype_t_ptr jl_new_datatype(jl_sym_t_ptr name,
-        #                                     jl_module_t_ptr module,
-        #                                     jl_datatype_t_ptr super,
-        #                                     jl_svec_t_ptr parameters,
-        #                                     jl_svec_t_ptr fnames, jl_svec_t_ptr ftypes,
-        #                                     int abstract, int mutabl,
-        #                                     int ninitialized)
-    lname = LLVM.call!(cg.builder, cg.extern[:jl_symbol_f], [sname])
+    
+    # error("Not supported, yet")
+    ## Everything past here is unfinished / untested
+    lname = emit_symbol!(cg, jtype.name)
+    
     mod = cg.extern[:jl_main_module_g]
-    super = get_and_emit_datatype!(cg, jtype.super.name)
-    params = LLVM.call!(cg.builder, cg.extern[:jl_svec_f], 
-        LLVM.Value[codegen!(cg, length(jtype.params)), [get_and_emit_datatype!(cg, t.name) for t in jtype.params]...])
-    fnames = LLVM.call!(cg.builder, cg.extern[:jl_svec_f], 
-        LLVM.Value[codegen!(cg, length(fieldnames(jtype))), [codegen!(cg, emit_symbol!(cg, s)) for s in fieldnames(jtype)]...])
-    ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec_f], 
-        LLVM.Value[codegen!(cg, length(jtype.types)), [get_and_emit_datatype!(cg, t.name) for t in jtype.types]...])
+    super = get_and_emit_datatype!(cg, jtype.super)
+    params = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
+        LLVM.Value[codegen!(cg, length(jtype.parameters)), [get_and_emit_datatype!(cg, t) for t in jtype.parameters]...])
+    if !isconcrete(jtype)
+        dt = LLVM.call!(cg.builder, cg.extern[:jl_new_abstracttype], LLVM.Value[lname, mod, super, params])
+        cg.datatype[jtype] = dt   
+        return dt
+    end
+    fnames = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
+        LLVM.Value[codegen!(cg, length(fieldnames(jtype))), [emit_symbol!(cg, s) for s in fieldnames(jtype)]...])
+    ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
+        LLVM.Value[codegen!(cg, length(jtype.types)), [get_and_emit_datatype!(cg, t) for t in jtype.types]...])
     abstrct = codegen!(cg, UInt32(jtype.abstract))
     mutabl = jtype.mutable ? codegen!(cg, UInt32(1)) : codegen!(cg, UInt32(0))
     ninitialized = codegen!(cg, UInt32(jtype.ninitialized))
-    dt = LLVM.call!(cg.builder, cg.extern[:jl_new_datatype_f], 
+    dt = LLVM.call!(cg.builder, cg.extern[:jl_new_datatype], 
         LLVM.Value[lname, mod, super, params, fnames, ftypes, abstrct, mutabl, ninitialized])
     cg.datatype[jtype] = dt   
     return dt
 end
 
+emit_symbol!(cg, x) =
+    LLVM.call!(cg.builder, cg.extern[:jl_symbol], [globalstring_ptr!(cg.builder, string(x))])

@@ -20,6 +20,7 @@ verify(codegen(sum_tuple, Tuple{Float64}))
 verify(codegen(sum_tuple, Tuple{Float32}))
 verify(codegen(sum_tuple, Tuple{Int64}))
 verify(codegen(sum_tuple, Tuple{Int32}))
+verify(codegen(sum_tuple, Tuple{Complex128}))
 
 function for_loop(x)
     a = 3

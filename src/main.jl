@@ -40,6 +40,7 @@ end
 
 function CodeCtx(name, ci::CodeInfo, result_type, argtypes; triple = nothing, datalayout = nothing)
     cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), name, ci, result_type, argtypes)
+    global CG = cg
     global M = cg.mod
     triple != nothing && triple!(cg.mod, triple)
     datalayout != nothing && datalayout!(cg.mod, datalayout)
@@ -288,7 +289,7 @@ codegen!(cg::CodeCtx, x::Bool) =
 function codegen!(cg::CodeCtx, s::String)
     # strinst = globalstring!(builder, s)
     gs = globalstring_ptr!(cg.builder, s)
-    return LLVM.call!(cg.builder, cg.extern[:jl_pchar_to_string_f], LLVM.Value[gs, codegen!(cg, Int32(length(s)+1))])
+    return LLVM.call!(cg.builder, cg.extern[:jl_pchar_to_string], LLVM.Value[gs, codegen!(cg, Int32(length(s)+1))])
 end
 
 # I'm not sure these are appropriate:
@@ -301,7 +302,7 @@ codegen!(cg::CodeCtx, ::Type{T}) where T <: Base.BitInteger =
 # The following creates the appropriate structures in memory
 function codegen!(cg::CodeCtx, ::Type{Array{T,N}}) where {T,N}
     typ = LLVM.load!(cg.builder, cg.datatype[T])
-    return LLVM.call!(cg.builder, cg.extern[:jl_apply_array_type_f], LLVM.Value[typ, codegen!(cg, UInt32(N))])
+    return LLVM.call!(cg.builder, cg.extern[:jl_apply_array_type], LLVM.Value[typ, codegen!(cg, UInt32(N))])
 end
 
 #
@@ -388,13 +389,15 @@ end
 # New - structure creation
 #
 function codegen!(cg::CodeCtx, ::Val{:new}, args, typ)
-    dt = get_and_emit_datatype!(cg, args[1].name)
-    res = LLVM.call!(cg.builder, cg.extern[:jl_new_struct_uninit_f], [dt])
+    @show args[1]
+    dump(args[1])
+    dt = get_and_emit_datatype!(cg, args[1])
+    res = LLVM.call!(cg.builder, cg.extern[:jl_new_struct_uninit], [dt])
     # set the fields
     for i in 2:length(args)
-        rhs = codegen!(cg, args[i])  # need to box?
+        rhs = emit_box!(cg, args[i]) 
         offset = codegen!(cg, UInt32(i - 1))
-        LLVM.call!(cg.builder, cg.extern[:jl_set_nth_field_f], LLVM.Value[res, offset, rhs])
+        LLVM.call!(cg.builder, cg.extern[:jl_set_nth_field], LLVM.Value[res, offset, rhs])
     end
     return res
 end

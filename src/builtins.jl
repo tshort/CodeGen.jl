@@ -4,13 +4,15 @@
 
 emit_box!(cg::CodeCtx, ::Type{Any}, v) = v
 
-emit_box!(cg::CodeCtx, ::Type{Bool}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_bool_f], LLVM.Value[v])
-emit_box!(cg::CodeCtx, ::Type{Int8}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_int8_f], LLVM.Value[v])
-emit_box!(cg::CodeCtx, ::Type{Int16}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int16_f], LLVM.Value[v])
-emit_box!(cg::CodeCtx, ::Type{Int32}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int32_f], LLVM.Value[v])
-emit_box!(cg::CodeCtx, ::Type{Int64}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int64_f], LLVM.Value[v])
-emit_box!(cg::CodeCtx, ::Type{Float32}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_float32_f], LLVM.Value[v])
-emit_box!(cg::CodeCtx, ::Type{Float64}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_float64_f], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Bool}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_bool], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Int8}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_int8], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Int16}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int16], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Int32}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int32], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Int64}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_int64], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Float32}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_float32], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{Float64}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_float64], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{SSAValue}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_ssavalue], LLVM.Value[v])
+emit_box!(cg::CodeCtx, ::Type{SlotNumber}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_slotnumber], LLVM.Value[v])
 
 function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
     v = codegen!(cg, x)
@@ -18,22 +20,8 @@ function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
     T <: Base.BitInteger && return emit_box!(cg, T, v)
     T <: Base.IEEEFloat  && return emit_box!(cg, T, v)
     T == Bool            && return emit_box!(cg, T, v)
-    if T == SlotNumber 
-        slottype = cg.code_info.slottypes[x.id]
-        if isbits(slottype) 
-            return emit_box!(cg, slottype, v)
-        else
-            return v
-        end
-    end
-    if T == SSAValue
-        ssatype = cg.code_info.ssavaluetypes[x.id]
-        if isbits(eltype(ssatype)) # This eltype seems wrong. I don't understand ssavaluetypes.
-            return emit_box!(cg, eltype(ssatype), v) 
-        else
-            return v
-        end
-    end
+    T == SSAValue        && return emit_box!(cg, T, codegen!(cg, x.id))
+    T == SlotNumber      && return emit_box!(cg, T, codegen!(cg, x.id))
     if T == Expr
         if isbits(x.typ) 
             return emit_box!(cg, x.typ, v)
@@ -41,21 +29,21 @@ function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
             return v
         end
     end
-    error("Boxing of $T not supported")
     return v
+    error("Boxing of $T not supported")
 end
 # emit_box!(cg::CodeCtx, v, t::LLVM.PointerType) = v
 
 function emit_unbox!(cg::CodeCtx, v, ::Type{T}) where T
     t = LLVM.llvmtype(v) 
     if t == jl_value_t_ptr 
-        T == Bool  && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_bool_f], LLVM.Value[v])
-        T == Int8  && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int8_f], LLVM.Value[v])
-        T == Int16 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int16_f], LLVM.Value[v])
-        T == Int32 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int32_f], LLVM.Value[v])
-        T == Int64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int64_f], LLVM.Value[v])
-        T == Float32 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_float32_f], LLVM.Value[v])
-        T == Float64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_float64_f], LLVM.Value[v])
+        T == Bool  && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_bool], LLVM.Value[v])
+        T == Int8  && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int8], LLVM.Value[v])
+        T == Int16 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int16], LLVM.Value[v])
+        T == Int32 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int32], LLVM.Value[v])
+        T == Int64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_int64], LLVM.Value[v])
+        T == Float32 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_float32], LLVM.Value[v])
+        T == Float64 && return LLVM.call!(cg.builder, cg.extern[:jl_unbox_float64], LLVM.Value[v])
     end
     return v
 end
