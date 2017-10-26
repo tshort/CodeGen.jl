@@ -8,9 +8,9 @@ One instance is used per function being compiled.
 mutable struct CodeCtx <: AbstractCodeCtx
     builder::LLVM.Builder
     mod::LLVM.Module
+    name::String
     code_info::CodeInfo
     result_type
-    name::String
     argtypes
     nargs::Int
     current_scope::CurrentScope
@@ -22,12 +22,12 @@ mutable struct CodeCtx <: AbstractCodeCtx
     extern::Dict{Symbol, Any}
     builtin::Dict{Symbol, LLVM.Function}
     datatype::Dict{Type, Any}
-   CodeCtx(mod::LLVM.Module, ci::CodeInfo, result_type, name, argtypes) = 
+    CodeCtx(mod::LLVM.Module, name, ci::CodeInfo, result_type, argtypes) = 
         new(LLVM.Builder(ctx),
             mod, 
+            name,
             ci,
             result_type,
-            name,
             argtypes,
             length(argtypes.parameters),
             CurrentScope(),
@@ -38,18 +38,23 @@ mutable struct CodeCtx <: AbstractCodeCtx
             )
 end
 
-function CodeCtx(ci::CodeInfo, result_type, name, argtypes; triple = nothing, datalayout = nothing)
-    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), ci, result_type, name, argtypes)
-    # triple == nothing && triple!(cg.mod, "wasm32-unknown-unknown")
-    # datalayout == nothing && datalayout!(cg.mod, "e-m:e-p:32:32-i64:64-n32:64-S128")
+function CodeCtx(name, ci::CodeInfo, result_type, argtypes; triple = nothing, datalayout = nothing)
+    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), name, ci, result_type, argtypes)
+    global M = cg.mod
+    triple != nothing && triple!(cg.mod, triple)
+    datalayout != nothing && datalayout!(cg.mod, datalayout)
     cg.builtin = setup_builtins!(cg)
     cg.extern = setup_externs!(cg.mod)
     cg.datatype = setup_types!(cg)
     return cg
 end
 
-function CodeCtx(orig_cg::CodeCtx, ci::CodeInfo, result_type, name, argtypes)
-    cg = CodeCtx(orig_cg.mod, ci, result_type, name, argtypes)
+CodeCtx(; triple = nothing, datalayout = nothing) = 
+    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), "", CodeInfo(), Void, Tuple{}, triple = triple, datalayout = datalayout)
+
+
+function CodeCtx(orig_cg::CodeCtx, name, ci::CodeInfo, result_type, argtypes)
+    cg = CodeCtx(orig_cg.mod, name, ci, result_type, argtypes)
     cg.builtin = orig_cg.builtin
     cg.extern = orig_cg.extern
     cg.datatype = orig_cg.datatype
@@ -81,13 +86,16 @@ function create_entry_block_allocation(cg::CodeCtx, fn::LLVM.Function, typ, varn
 end
 
 """
-    codegen(fun, argtypes; optimize_lowering = true) 
+    codegen(fun, argtypes; optimize_lowering = true, triple = nothing, datalayout = nothing) 
 
 Return the bitcode for `fun` with argument types `argtypes`. 
 `argtypes` is a tuple type (e.g. `Tuple{Float64, Int}`).
 
 The optional argument `optimize_lowering` determines whether 
 `code_typed` uses optimization when infering types.
+
+The optional arguments `triple` and `datalayout` are strings that 
+set the LLVM triple and data layout for the module being generated.
 
 `codegen` creates a `CodeCtx` and runs `codegen!(cg)`. 
 Direct calls to that can be done for more flexibility.
@@ -96,10 +104,10 @@ The return value is an LLVM module. This can be written to a bitcode
 files with `write(mod, filepath)`. It can be optimized with
 `optimize!(mod)`.
 """
-function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
+function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     funname = string(Base.function_name(fun)) # good link: typeof(f).name.mt.name; https://stackoverflow.com/questions/38819327/given-a-function-object-how-do-i-find-its-name-and-module
-    cg = CodeCtx(ci, dt, funname, argtypes)
+    cg = CodeCtx(funname, ci, dt, argtypes)
     return codegen!(cg)
 end
 
@@ -148,6 +156,13 @@ function codegen!(cg::CodeCtx)
     # LLVM.dispose(cg.builder)  # ?? something different for multiple funs 
     return cg.mod
 end
+
+function codegen!(cg::CodeCtx, @nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
+    ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    funname = string(Base.function_name(fun))
+    return codegen!(CodeCtx(cg, funname, ci, dt, argtypes))
+end
+
 
 #
 # Expressions
@@ -234,7 +249,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
         argtypes = Tuple{args[1].specTypes.parameters[2:end]...}
         fun = eval(args[2])
         ci, dt = code_typed(fun, argtypes, optimize = true)[1]
-        newcg = CodeCtx(cg, ci, dt, name, argtypes)
+        newcg = CodeCtx(cg, name, ci, dt, argtypes)
         codegen!(newcg)
         func = newcg.func
     end
@@ -247,7 +262,8 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
 end
 
 function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
-    if length(args) == 1
+    if length(args) == 1 && args[1] != nothing
+        @show args[1]
         res = codegen!(cg, args[1])
         if LLVM.llvmtype(res) != llvmtype(cg.result_type)
             res = emit_unbox!(cg, res, cg.result_type)

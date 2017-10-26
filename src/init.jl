@@ -243,18 +243,17 @@ has_terminator(bb::BasicBlock) =
 
 
 #
-# DataType - emit and return a stored type or create a new type
+# DataType - emit and return a stored type or create a new type and store it
 #
 function get_and_emit_datatype!(cg, name)
     jtype = eval(name)
-    # if name in Symbol.(keys(cg.datatype))
     if haskey(cg.datatype, jtype)
         return cg.datatype[jtype]
     end
     @show jtype
     @show cg.datatype
     error("Not supported, yet")
-    ## Everything past here is broken
+    ## Everything past here is unfinished
         # JL_DLLEXPORT jl_datatype_t_ptr jl_new_datatype(jl_sym_t_ptr name,
         #                                     jl_module_t_ptr module,
         #                                     jl_datatype_t_ptr super,
@@ -265,15 +264,18 @@ function get_and_emit_datatype!(cg, name)
     lname = LLVM.call!(cg.builder, cg.extern[:jl_symbol_f], [sname])
     mod = cg.extern[:jl_main_module_g]
     super = get_and_emit_datatype!(cg, jtype.super.name)
-    # params = 
-    # fnames = 
-    # ftypes = 
+    params = LLVM.call!(cg.builder, cg.extern[:jl_svec_f], 
+        LLVM.Value[codegen!(cg, length(jtype.params)), [get_and_emit_datatype!(cg, t.name) for t in jtype.params]...])
+    fnames = LLVM.call!(cg.builder, cg.extern[:jl_svec_f], 
+        LLVM.Value[codegen!(cg, length(fieldnames(jtype))), [codegen!(cg, emit_symbol!(cg, s)) for s in fieldnames(jtype)]...])
+    ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec_f], 
+        LLVM.Value[codegen!(cg, length(jtype.types)), [get_and_emit_datatype!(cg, t.name) for t in jtype.types]...])
     abstrct = codegen!(cg, UInt32(jtype.abstract))
-    mutabl = jdt.mutable ? codegen!(cg, UInt32(1)) : codegen!(cg, UInt32(1))
+    mutabl = jtype.mutable ? codegen!(cg, UInt32(1)) : codegen!(cg, UInt32(0))
     ninitialized = codegen!(cg, UInt32(jtype.ninitialized))
     dt = LLVM.call!(cg.builder, cg.extern[:jl_new_datatype_f], 
         LLVM.Value[lname, mod, super, params, fnames, ftypes, abstrct, mutabl, ninitialized])
-    cg.datatype[jtype] = dt
+    cg.datatype[jtype] = dt   
     return dt
 end
 

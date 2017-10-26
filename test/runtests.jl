@@ -18,8 +18,8 @@ sum_tuple(x) = sum((x, x, 1.0))
 
 verify(codegen(sum_tuple, Tuple{Float64}))
 verify(codegen(sum_tuple, Tuple{Float32}))
-verify(codegen(sum_tuple, Tuple{Int32}))
 verify(codegen(sum_tuple, Tuple{Int64}))
+verify(codegen(sum_tuple, Tuple{Int32}))
 
 function for_loop(x)
     a = 3
