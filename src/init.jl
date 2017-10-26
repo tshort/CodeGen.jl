@@ -87,7 +87,7 @@ function setup_externs!(mod)
     #
     # Functions
     # 
-    for s in [:int64, :int32, :int16, :int8, :int64, :int32, :int16, :int8, :float64, :float32]
+    for s in [:int64, :int32, :int16, :int8, :uint64, :uint32, :uint16, :uint8, :float64, :float32]
         #e[:jl_box_int64_f] = extern!(mod, "jl_box_int64", jl_value_t_ptr, LLVMType[int64_t])
         e[Symbol(:jl_box_, s, :_f)] = extern!(mod, "jl_box_$s", jl_value_t_ptr, LLVMType[eval(Symbol(s, :_t))])
         # e[:jl_unbox_int64_f] = extern!(mod, "jl_unbox_int64", int64_t, LLVMType[jl_value_t_ptr])
