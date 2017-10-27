@@ -5,6 +5,14 @@ using Test
 using CodeGen
 using LLVM
 
+abs_fun(x) = abs(x)
+
+verify(codegen(abs_fun, Tuple{Float64}))
+z = codegen(abs_fun, Tuple{Float64})
+optimize!(z)
+# @show z
+
+
 array_max(x) = maximum(Int[3,x])
 
 # @show code_typed(Base._mapreduce, Tuple{typeof(identity), typeof(Base.scalarmax), IndexLinear, Array{Int32,1}}, optimize=true)
@@ -14,13 +22,13 @@ array_max(x) = maximum(Int[3,x])
 # At the REPL, a `Base.OneTo` gets optimized out, but it doesn't in the test version.
 verify(codegen(array_max, Tuple{Int}))
 
-sum_tuple(x) = sum((x, x, 1.0))
+sum_tuple(x) = abs(sum((x, x, 1.0)))
 
 verify(codegen(sum_tuple, Tuple{Float64}))
 verify(codegen(sum_tuple, Tuple{Float32}))
 verify(codegen(sum_tuple, Tuple{Int64}))
 verify(codegen(sum_tuple, Tuple{Int32}))
-verify(codegen(sum_tuple, Tuple{Complex128}))
+# verify(codegen(sum_tuple, Tuple{Complex128}))
 
 function for_loop(x)
     a = 3

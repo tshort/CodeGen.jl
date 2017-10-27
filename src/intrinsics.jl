@@ -67,6 +67,7 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     # ctlz_int
     # cttz_int
     # abs_float
+    name == :abs_float && return LLVM.call!(cg.builder, LLVM.Function(cg.mod, "llvm.fabs", LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
     # copysign_float
     # flipsign_int
     # ceil_llvm
