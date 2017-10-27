@@ -187,7 +187,7 @@ function setup_types!(cg)
     setup_type!(jl_datatype_t_ptr, "jl_abstractstring_type")
     setup_type!(jl_datatype_t_ptr, "jl_string_type", String)
     setup_type!(jl_datatype_t_ptr, "jl_errorexception_type", ErrorException)
-    setup_type!(jl_value_t,        "jl_argumenterror_type", ArgumentError)
+    setup_type!(jl_value_t_ptr,    "jl_argumenterror_type", ArgumentError)
     setup_type!(jl_datatype_t_ptr, "jl_loaderror_type", LoadError)
     setup_type!(jl_datatype_t_ptr, "jl_initerror_type", InitError)
     setup_type!(jl_datatype_t_ptr, "jl_typeerror_type", TypeError)
@@ -262,33 +262,35 @@ function get_and_emit_datatype!(cg, jtype)
         jtype = eval(jtype)
     end
     if haskey(cg.datatype, jtype)
-        return cg.datatype[jtype]
+        return LLVM.load!(cg.builder, cg.datatype[jtype])
     end
     
     # error("Not supported, yet")
     ## Everything past here is unfinished / untested
     lname = emit_symbol!(cg, jtype.name)
     
-    mod = cg.extern[:jl_main_module_g]
+    mod = LLVM.load!(cg.builder, cg.extern[:jl_main_module_g])
     super = get_and_emit_datatype!(cg, jtype.super)
     params = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
         LLVM.Value[codegen!(cg, length(jtype.parameters)), [get_and_emit_datatype!(cg, t) for t in jtype.parameters]...])
     if !isconcrete(jtype)
         dt = LLVM.call!(cg.builder, cg.extern[:jl_new_abstracttype], LLVM.Value[lname, mod, super, params])
-        cg.datatype[jtype] = dt   
-        return dt
+    else
+        fnames = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
+            LLVM.Value[codegen!(cg, length(fieldnames(jtype))), [emit_symbol!(cg, s) for s in fieldnames(jtype)]...])
+        ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
+            LLVM.Value[codegen!(cg, length(jtype.types)), [get_and_emit_datatype!(cg, t) for t in jtype.types]...])
+        abstrct = codegen!(cg, UInt32(jtype.abstract))
+        mutabl = jtype.mutable ? codegen!(cg, UInt32(1)) : codegen!(cg, UInt32(0))
+        ninitialized = codegen!(cg, UInt32(jtype.ninitialized))
+        dt = LLVM.call!(cg.builder, cg.extern[:jl_new_datatype], 
+            LLVM.Value[lname, mod, super, params, fnames, ftypes, abstrct, mutabl, ninitialized])
+            # LLVMType[jl_sym_t_ptr, jl_module_t_ptr, jl_datatype_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, int32_t, int32_t, int32_t])
     end
-    fnames = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
-        LLVM.Value[codegen!(cg, length(fieldnames(jtype))), [emit_symbol!(cg, s) for s in fieldnames(jtype)]...])
-    ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
-        LLVM.Value[codegen!(cg, length(jtype.types)), [get_and_emit_datatype!(cg, t) for t in jtype.types]...])
-    abstrct = codegen!(cg, UInt32(jtype.abstract))
-    mutabl = jtype.mutable ? codegen!(cg, UInt32(1)) : codegen!(cg, UInt32(0))
-    ninitialized = codegen!(cg, UInt32(jtype.ninitialized))
-    dt = LLVM.call!(cg.builder, cg.extern[:jl_new_datatype], 
-        LLVM.Value[lname, mod, super, params, fnames, ftypes, abstrct, mutabl, ninitialized])
-    cg.datatype[jtype] = dt   
-    return dt
+    loc = LLVM.GlobalVariable(cg.mod, jl_datatype_t_ptr, string(jtype))
+    sdt = LLVM.store!(cg.builder, dt, loc)
+    cg.datatype[jtype] = sdt
+    return LLVM.load!(cg.builder, loc)
 end
 
 emit_symbol!(cg, x) =
