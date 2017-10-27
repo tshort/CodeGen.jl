@@ -64,14 +64,14 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     # ashr_int
     a1(name) = LLVM.call!(cg.builder, LLVM.Function(cg.mod, name, LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
     # 
-    name == :bswap_int && return a1("llvm.bswapintr")
-    name == :ctpop_int && return a1("llvm.ctpopintr")
+    name == :bswap_int && return a1("llvm.bswap")
+    name == :ctpop_int && return a1("llvm.ctpop")
     name == :abs_float && return a1("llvm.fabs")
-    name == :ceil_llvm && return a1("llvm.ceilintr")
-    name == :floor_llvm && return a1("llvm.floorintr")
-    name == :trunc_llvm && return a1("llvm.truncintr")
-    name == :rint_llvm && return a1("llvm.rintintr")
-    name == :sqrt_llvm && return a1("llvm.sqrtintr")
+    name == :ceil_llvm && return a1("llvm.ceil")
+    name == :floor_llvm && return a1("llvm.floor")
+    name == :trunc_llvm && return a1("llvm.trunc")
+    name == :rint_llvm && return a1("llvm.rint")
+    name == :sqrt_llvm && return a1("llvm.sqrt")
 
     # ctlz_int
     # cttz_int
