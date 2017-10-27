@@ -391,7 +391,7 @@ end
 function codegen!(cg::CodeCtx, ::Val{:new}, args, typ)
     @show args[1]
     dump(args[1])
-    dt = get_and_emit_datatype!(cg, args[1])
+    dt = load_and_emit_datatype!(cg, args[1])
     res = LLVM.call!(cg.builder, cg.extern[:jl_new_struct_uninit], [dt])
     # set the fields
     for i in 2:length(args)
