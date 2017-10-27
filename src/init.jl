@@ -262,10 +262,7 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
         return LLVM.load!(cg.builder, cg.datatype[JT])
     end
     
-    # error("Not supported, yet")
-    ## Everything past here is unfinished / untested
     lname = emit_symbol!(cg, JT.name)
-    
     mod = LLVM.load!(cg.builder, cg.extern[:jl_main_module_g])
     super = load_and_emit_datatype!(cg, JT.super)
     params = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
