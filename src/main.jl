@@ -137,17 +137,18 @@ function codegen!(cg::CodeCtx)
     entry = LLVM.BasicBlock(cg.func, "entry", ctx)
     LLVM.position!(cg.builder, entry)
     for (i, param) in enumerate(LLVM.parameters(cg.func))
-        argname = string(ci.slotnames[i + 1])
+        argname = string(ci.slotnames[i + 1], "_s", i+1)
         if !isa(LLVM.llvmtype(param), LLVM.VoidType)
-            alloc = create_entry_block_allocation(cg, cg.func, LLVM.llvmtype(param), argname)
+            alloc = LLVM.alloca!(cg.builder, LLVM.llvmtype(param), argname)
+            # alloc = create_entry_block_allocation(cg, cg.func, LLVM.llvmtype(param), argname)
             LLVM.store!(cg.builder, param, alloc)
             current_scope(cg)[argname] = alloc
         end
     end
     for i in cg.nargs+2:length(ci.slotnames)
-        varname = string(ci.slotnames[i])
+        varname = string(ci.slotnames[i], "_s", i)
         vartype = llvmtype(ci.slottypes[i])
-        alloc = LLVM.alloca!(cg.builder, vartype)
+        alloc = LLVM.alloca!(cg.builder, vartype, varname)
         current_scope(cg)[varname] = alloc
     end
     for node in ci.code
@@ -177,17 +178,17 @@ end
 # Variable assignment and reading
 #
 function codegen!(cg::CodeCtx, v::SlotNumber) 
-    varname = string(cg.code_info.slotnames[v.id])
+    varname = string(cg.code_info.slotnames[v.id], "_s", v.id)
     # cg.slots[v.id]
     V = get(current_scope(cg), varname, nothing)
     V == nothing && error("did not find variable $(varname)")
-    return LLVM.load!(cg.builder, V, varname)
+    return LLVM.load!(cg.builder, V, varname*"_")
 end
 
 function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
     result = codegen!(cg, args[2])
     if isa(args[1], SlotNumber)
-        varname = string(cg.code_info.slotnames[args[1].id])
+        varname = string(cg.code_info.slotnames[args[1].id], "_s", args[1].id)
         V = get(current_scope(cg), varname, nothing)
         V == nothing && error("unknown variable name $(varname)")
         if LLVM.llvmtype(result) == int1_t 
@@ -230,14 +231,16 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     llvmargs = LLVM.Value[]
     llvmargs = Any[]
     fun = eval(args[1])
+    name = string(args[1])
+    # dump(args)
     if isa(fun, Core.IntrinsicFunction)
         return emit_intrinsic!(cg, args[1].name, args[2:end])
     end
     if isa(fun, Core.Builtin)
         return emit_unbox!(cg, emit_builtin!(cg, args[1].name, args[2:end]), typ)
     end
-    name = string(args[1])
-    error("Function $name not supported.")
+    codegen!(cg, Val(:invoke), Any[which(eval(args[1]), Tuple{(typeof(a) for a in args[2:end])...}), args[2:end]...], typ)
+    # error("Function $name not supported.")
 end
 
 function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)

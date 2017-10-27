@@ -1,4 +1,5 @@
-# # Sets up global values for LLVM types, Julia types, external declarations, and other utilities.
+# 
+# Sets up global values for LLVM types, Julia types, external declarations, and other utilities.
 # 
 
 # const ctx = LLVM.Context(convert(LLVM.API.LLVMContextRef, cglobal(:jl_LLVMContext, Void)))

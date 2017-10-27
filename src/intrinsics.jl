@@ -49,10 +49,10 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :ult_int && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntULT, args[1], args[2])
     name == :sle_int && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntSLE, args[1], args[2])
     name == :ule_int && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntULE, args[1], args[2])
-    name == :eq_float && return LLVM.icmp!(cg.builder, LLVM.API.LLVMRealOEQ, args[1], args[2])
-    name == :ne_float && return LLVM.icmp!(cg.builder, LLVM.API.LLVMRealONE, args[1], args[2])
-    name == :lt_float && return LLVM.icmp!(cg.builder, LLVM.API.LLVMRealOLT, args[1], args[2])
-    name == :le_float && return LLVM.icmp!(cg.builder, LLVM.API.LLVMRealOLE, args[1], args[2])
+    name == :eq_float && return LLVM.fcmp!(cg.builder, LLVM.API.LLVMRealOEQ, args[1], args[2])
+    name == :ne_float && return LLVM.fcmp!(cg.builder, LLVM.API.LLVMRealONE, args[1], args[2])
+    name == :lt_float && return LLVM.fcmp!(cg.builder, LLVM.API.LLVMRealOLT, args[1], args[2])
+    name == :le_float && return LLVM.fcmp!(cg.builder, LLVM.API.LLVMRealOLE, args[1], args[2])
     ## need fast versions of above
     # fpiseq
     # fpislt

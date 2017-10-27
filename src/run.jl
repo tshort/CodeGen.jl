@@ -2,7 +2,7 @@
 # Bitcode optimization and running utilities.
 # 
 
-export optimize!
+export optimize!, run
 
 """
     optimize!(mod::LLVM.Module)
@@ -30,23 +30,38 @@ function optimize!(mod::LLVM.Module)
     return nothing
 end
 
-#
-# BROKEN
-#
-function LLVM.run(mod::LLVM.Module, fun::String, restype, args...)
-    res_jl = 0.0
-    LLVM.JIT(mod) do engine
-        if !haskey(LLVM.functions(engine), fun)
-            error("did not find $fun function in module")
+function run(fun, args...)
+    tt = Tuple{(typeof(a) for a in args)...}
+    mod = codegen(fun, tt)
+    optimize!(mod)
+    ci = code_typed(fun, tt)
+    restype = last(last(ci))
+    funname = string(fun)
+    res_jl = 0
+    # LLVM.JIT(mod) do engine    # This gives wrong answers with JIT and with ExecutionEngine
+    LLVM.Interpreter(mod) do engine
+        if !haskey(LLVM.functions(engine), funname)
+            error("did not find $funname function in module")
         end
-        f = LLVM.functions(engine)[fun]
+        f = LLVM.functions(engine)[funname]
         llvmargs = [LLVM.GenericValue(llvmtype(typeof(a)), a) for a in args]
-        res = LLVM.run(engine, f, llvmargs)
-        res_jl = convert(restype, res)
-        # LLVM.dispose(res)
+        if length(args) > 0
+            res = LLVM.run(engine, f, llvmargs)
+        else
+            res = LLVM.run(engine, f)
+        end
+        if restype <: Integer
+            res_jl = convert(restype, res)
+        elseif restype <: AbstractFloat
+            res_jl = convert(restype, res, llvmtype(restype))
+        else
+            res_jl = convert(restype, res)
+        end
+        LLVM.dispose(res)
     end
     return res_jl
 end
+
 
 
 function Base.write(mod::LLVM.Module, path::String)
