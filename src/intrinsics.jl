@@ -62,19 +62,21 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     # shl_int
     # lshr_int
     # ashr_int
-    # bswap_int
-    # ctpop_int
+    a1(name) = LLVM.call!(cg.builder, LLVM.Function(cg.mod, name, LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
+    # 
+    name == :bswap_int && return a1("llvm.bswapintr")
+    name == :ctpop_int && return a1("llvm.ctpopintr")
+    name == :abs_float && return a1("llvm.fabs")
+    name == :ceil_llvm && return a1("llvm.ceilintr")
+    name == :floor_llvm && return a1("llvm.floorintr")
+    name == :trunc_llvm && return a1("llvm.truncintr")
+    name == :rint_llvm && return a1("llvm.rintintr")
+    name == :sqrt_llvm && return a1("llvm.sqrtintr")
+
     # ctlz_int
     # cttz_int
-    # abs_float
-    name == :abs_float && return LLVM.call!(cg.builder, LLVM.Function(cg.mod, "llvm.fabs", LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
     # copysign_float
-    # flipsign_int
-    # ceil_llvm
-    # floor_llvm
-    # trunc_llvm
-    # rint_llvm
-    # sqrt_llvm
+    # flipsign_int 
     name == :sitofp  && return LLVM.sitofp!(cg.builder, args[2], args[1])
     name == :uitofp  && return LLVM.uitofp!(cg.builder, args[2], args[1])
     name == :fptosi  && return LLVM.fptosi!(cg.builder, args[2], args[1])

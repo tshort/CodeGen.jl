@@ -10,6 +10,7 @@ abs_fun(x) = abs(x)
 verify(codegen(abs_fun, Tuple{Float64}))
 z = codegen(abs_fun, Tuple{Float64})
 optimize!(z)
+verify(z)
 # @show z
 
 
