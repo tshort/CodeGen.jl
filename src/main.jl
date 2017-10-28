@@ -123,6 +123,7 @@ end
 This is the main function for dispatching various types of code generation.
 """
 function codegen!(cg::CodeCtx)
+    @info "## $(cg.name)"
     ci = cg.code_info
     argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
     for i in 1:length(argtypes)
