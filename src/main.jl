@@ -232,27 +232,41 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     llvmargs = Any[]
     fun = eval(args[1])
     name = string(args[1])
-    # dump(args)
+    @show name
     if isa(fun, Core.IntrinsicFunction)
         return emit_intrinsic!(cg, args[1].name, args[2:end])
     end
     if isa(fun, Core.Builtin)
+        dump(args)
         return emit_unbox!(cg, emit_builtin!(cg, args[1].name, args[2:end]), typ)
     end
-    codegen!(cg, Val(:invoke), Any[which(eval(args[1]), Tuple{(typeof(a) for a in args[2:end])...}), args[2:end]...], typ)
+    ## NOTE: everything past here may be wrong!
+    dump(args)
+    dump(cg.code_info.slottypes)
+    argstypetuple = Tuple{(gettypes(cg, a) for a in args[2:end])...}
+    # argstypetuple = Tuple{(Any for a in args[2:end])...}
+    @show argstypetuple
+    method = which(eval(args[1]), argstypetuple)
+    codegen!(cg, Val(:invoke), Any[method, args[2:end]...], typ)
     # error("Function $name not supported.")
 end
+gettypes(cg::CodeCtx, x::SlotNumber) = cg.code_info.slottypes[x.id]
+# gettypes(cg::CodeCtx, x::GlobalRef) = eval(x)
+gettypes(cg::CodeCtx, x::GlobalRef) = Type{Any}
+gettypes(cg::CodeCtx, x) = typeof(x)
 
 function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     # name = string(Base.function_name(args[1]))
-    name = string(args[2])
+    name = string(getname(args[1]))
+    dump(args, maxdepth=4)
     println("Invoking... $name")
     if haskey(LLVM.functions(cg.mod), name)
         func = LLVM.functions(cg.mod)[name]
     else
-        argtypes = Tuple{args[1].specTypes.parameters[2:end]...}
-        fun = eval(args[2])
+        argtypes = getargtypes(args[1])
+        fun = eval(getname(args[1]))    # need to replace this?
         ci, dt = code_typed(fun, argtypes, optimize = true)[1]
+        # dump( Core.Inference.retrieve_code_info(args[1]) )
         newcg = CodeCtx(cg, name, ci, dt, argtypes)
         codegen!(newcg)
         func = newcg.func
@@ -261,9 +275,13 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     for v in args[3:end]
         push!(llvmargs, codegen!(cg, v))
     end
-    
     return LLVM.call!(cg.builder, func, llvmargs)
 end
+
+getname(x::Core.MethodInstance) = getfield(x.def.module, x.def.name)
+getname(x::Method) = getfield(x.module, x.name)
+getargtypes(x::Core.MethodInstance) = Tuple{x.specTypes.parameters[2:end]...}
+getargtypes(x::Method) = Tuple{x.sig.parameters[2:end]...}
 
 function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
     if length(args) == 1 && args[1] != nothing
@@ -313,12 +331,13 @@ end
 #
 codegen!(cg::CodeCtx, v::SSAValue) = cg.ssas[v.id]
 
-codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
-
 codegen!(cg::CodeCtx, ::LineNumberNode) = nothing
 
 codegen!(cg::CodeCtx, ::NewvarNode) = nothing
 
+codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
+
+codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1])
 
 #
 # ccall

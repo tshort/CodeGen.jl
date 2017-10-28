@@ -6,6 +6,7 @@ using CodeGen
 using LLVM
 
 
+
 function _cgtest(e)
     f = e.args[1]
     args = length(e.args) > 1 ? e.args[2:end] : Any[]
@@ -83,6 +84,18 @@ verify(codegen(sum_tuple, Tuple{Complex128}))
 
 @cgtest sum_tuple(5)
 @cgtest sum_tuple(5.5)
+
+
+function type_unstable()
+    x=1
+    for i = 1:10
+      x = x/2
+    end
+    return x
+end
+
+mod = codegen(type_unstable, Tuple{})
+
 
 function an_if(x) 
     return x == 3 ? 4 : 5

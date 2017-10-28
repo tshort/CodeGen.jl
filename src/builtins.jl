@@ -15,6 +15,7 @@ emit_box!(cg::CodeCtx, ::Type{SSAValue}, v) = LLVM.call!(cg.builder, cg.extern[:
 emit_box!(cg::CodeCtx, ::Type{SlotNumber}, v) = LLVM.call!(cg.builder, cg.extern[:jl_box_slotnumber], LLVM.Value[v])
 
 function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
+    isa(x, Type)         && return cg.datatype[x]
     v = codegen!(cg, x)
     T == Any && return v
     T <: Base.BitInteger && return emit_box!(cg, T, v)
