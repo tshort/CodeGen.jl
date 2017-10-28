@@ -15,7 +15,7 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :udiv_int && return LLVM.udiv!(cg.builder, args[1], args[2])
     name == :srem_int && return LLVM.srem!(cg.builder, args[1], args[2])
     name == :urem_int && return LLVM.urem!(cg.builder, args[1], args[2])
-    name == :neg_float  && return LLVM.fsub!(cg.builder, codegen(cg, -0.0), args[1])
+    name == :neg_float  && return LLVM.fsub!(cg.builder, codegen!(cg, -0.0), args[1])
     name == :add_float  && return LLVM.fadd!(cg.builder, args[1], args[2])
     name == :sub_float  && return LLVM.fsub!(cg.builder, args[1], args[2])
     name == :mul_float  && return LLVM.fmul!(cg.builder, args[1], args[2])
@@ -30,7 +30,8 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :rem_float_fast  && return LLVM.frem!(cg.builder, args[1], args[2])
     ## More tough ones
     # name == :fma_float  && return LLVM.frem!(cg.builder, args[1], args[2], "sremtmp")
-    # name == :muladd_float  && return LLVM.frem!(cg.builder, args[1], args[2], "sremtmp")
+    a123(name) = LLVM.call!(cg.builder, LLVM.Function(cg.mod, name, LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1],args[2],args[3]])
+    name == :muladd_float  && return a123("llvm.fmuladd")
     ## WRONG. Next, need all of the "checked" intrinsics.
     name == :checked_sadd_int  && return LLVM.add!(cg.builder, args[1], args[2])
     name == :checked_uadd_int  && return LLVM.add!(cg.builder, args[1], args[2])
@@ -59,9 +60,8 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :and_int  && return LLVM.and!(cg.builder, args[1], args[2])
     name == :or_int   && return LLVM.or!(cg.builder, args[1], args[2])
     name == :xor_int  && return LLVM.xor!(cg.builder, args[1], args[2])
-    # shl_int
-    # lshr_int
-    # ashr_int
+
+
     a1(name) = LLVM.call!(cg.builder, LLVM.Function(cg.mod, name, LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
     # 
     name == :bswap_int && return a1("llvm.bswap")
@@ -96,6 +96,23 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     ## NOT UNIVERSAL, but maybe useful for getting a few things to work
     name == :select_value && return LLVM.select!(cg.builder, args[1], args[2], args[3])
     name == :not_int      && return LLVM.not!(cg.builder, args[1])
+    name == :shl_int  && return LLVM.shl!(cg.builder, args[1], args[2])    # WRONG - FIX
+    name == :lshr_int  && return LLVM.lshr!(cg.builder, args[1], args[2])    # WRONG - FIX
+    # if name == :lshr_int
+    #     t = LLVM.llvmtype(args[1])
+    #     return LLVM.select!(cg.builder, 
+    #                         LLVM.icmp!(cg.builder, LLVM.API.LLVMIntUGE, args[2], 
+    #                                    ) 
+    #     )
+    # end
+
+    # case lshr_int:
+    #     return ctx.builder.CreateSelect(
+    #             ctx.builder.CreateICmpUGE(y, ConstantInt::get(y->getType(),
+    #                                                       t->getPrimitiveSizeInBits())),
+    #             ConstantInt::get(t, 0),
+    #             ctx.builder.CreateLShr(x, uint_cnvt(ctx, t, y)));
+    # ashr_int
     ######
 
     error("Unsupported intrinsic: $name")

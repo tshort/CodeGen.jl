@@ -4,6 +4,7 @@ module CodeGen
 export codegen, codegen!
 
 using LLVM
+using MicroLogging
 
 include("init.jl")
 include("scope.jl")

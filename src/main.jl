@@ -151,7 +151,8 @@ function codegen!(cg::CodeCtx)
         alloc = LLVM.alloca!(cg.builder, vartype, varname)
         current_scope(cg)[varname] = alloc
     end
-    for node in ci.code
+    for (i, node) in enumerate(ci.code)
+        @debug "$(cg.name): node $i/$(length(ci.code))" node
         codegen!(cg, node)
     end
     # LLVM.verify(func)
@@ -232,20 +233,18 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     llvmargs = Any[]
     fun = eval(args[1])
     name = string(args[1])
-    @show name
     if isa(fun, Core.IntrinsicFunction)
+        @debug "$(cg.name): calling intrinsic: $name"
         return emit_intrinsic!(cg, args[1].name, args[2:end])
     end
     if isa(fun, Core.Builtin)
-        dump(args)
+        @debug "$(cg.name): calling builtin: $name"
         return emit_unbox!(cg, emit_builtin!(cg, args[1].name, args[2:end]), typ)
     end
+    @debug "$(cg.name): calling other method: $name"
     ## NOTE: everything past here may be wrong!
-    dump(args)
-    dump(cg.code_info.slottypes)
     argstypetuple = Tuple{(gettypes(cg, a) for a in args[2:end])...}
     # argstypetuple = Tuple{(Any for a in args[2:end])...}
-    @show argstypetuple
     method = which(eval(args[1]), argstypetuple)
     codegen!(cg, Val(:invoke), Any[method, args[2:end]...], typ)
     # error("Function $name not supported.")
@@ -255,18 +254,28 @@ gettypes(cg::CodeCtx, x::SlotNumber) = cg.code_info.slottypes[x.id]
 gettypes(cg::CodeCtx, x::GlobalRef) = Type{Any}
 gettypes(cg::CodeCtx, x) = typeof(x)
 
+
 function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     # name = string(Base.function_name(args[1]))
     name = string(getname(args[1]))
-    dump(args, maxdepth=4)
-    println("Invoking... $name")
+    @info "$(cg.name): invoking $name"
     if haskey(LLVM.functions(cg.mod), name)
         func = LLVM.functions(cg.mod)[name]
     else
+        # if isa(args[1], Core.MethodInstance)
+        #     mi = args[1]
+        #     ci = Core.Inference.retrieve_code_info(mi)
+        #     dt = mi.rettype
+        #     argtypes = Tuple{mi.specTypes.parameters[2:end]...}
+        # else  # method
+        #     m = args[1]
+        #     fun = eval(getfield(m.module, m.name))
+        #     argtypes = Tuple{m.sig.parameters[2:end]...}
+        #     ci, dt = code_typed(fun, argtypes, optimize = true)[1]
+        # end
         argtypes = getargtypes(args[1])
-        fun = eval(getname(args[1]))    # need to replace this?
+        fun = eval(getname(args[1]))
         ci, dt = code_typed(fun, argtypes, optimize = true)[1]
-        # dump( Core.Inference.retrieve_code_info(args[1]) )
         newcg = CodeCtx(cg, name, ci, dt, argtypes)
         codegen!(newcg)
         func = newcg.func
@@ -334,6 +343,8 @@ codegen!(cg::CodeCtx, v::SSAValue) = cg.ssas[v.id]
 codegen!(cg::CodeCtx, ::LineNumberNode) = nothing
 
 codegen!(cg::CodeCtx, ::NewvarNode) = nothing
+
+codegen!(cg::CodeCtx, ::Void) = nothing
 
 codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
 

@@ -4,7 +4,12 @@
 using Test
 using CodeGen
 using LLVM
+using MicroLogging
 
+configure_logging(min_level=:debug)
+
+
+# codegen(sin, Tuple{Float64})
 
 
 function _cgtest(e)

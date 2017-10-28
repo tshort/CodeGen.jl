@@ -51,6 +51,7 @@ end
 
 
 function emit_builtin!(cg::CodeCtx, name, jlargs)
+    # contains(string(name), "throw") && return cg.extern[:jl_void_type_g]  # Bail out on errors for now
     nargs = length(jlargs)
     if name == :(===) && nargs == 2
         # if isbits(args[1]) && typeof(args[1]) == typeof(args[2])
