@@ -62,7 +62,6 @@ optimize!(mod)
 
 abs_fun(x) = abs(x)
 
-verify(codegen(abs_fun, Tuple{Float64}))
 z = codegen(abs_fun, Tuple{Float64})
 optimize!(z)
 verify(z)
@@ -76,16 +75,16 @@ array_max(x) = maximum(Int[3,x])
 # @show code_typed(Base._mapreduce, Tuple{typeof(identity), typeof(Base.scalarmax), IndexLinear, Array{Int32,1}}, optimize=false)
 # This one works with `include(Pkg.dir("CodeGen", "test/runtests.jl"))` but not with `Pkg.test("CodeGen")`.
 # At the REPL, a `Base.OneTo` gets optimized out, but it doesn't in the test version.
-verify(codegen(array_max, Tuple{Int}))
+codegen(array_max, Tuple{Int})
 
 
 sum_tuple(x) = sum((x, x, 1.0))
 
-verify(codegen(sum_tuple, Tuple{Float64}))
-verify(codegen(sum_tuple, Tuple{Float32}))
-verify(codegen(sum_tuple, Tuple{Int64}))
-verify(codegen(sum_tuple, Tuple{Int32}))
-verify(codegen(sum_tuple, Tuple{Complex128}))
+codegen(sum_tuple, Tuple{Float64})
+codegen(sum_tuple, Tuple{Float32})
+codegen(sum_tuple, Tuple{Int64})
+codegen(sum_tuple, Tuple{Int32})
+codegen(sum_tuple, Tuple{Complex128})
 
 @cgtest sum_tuple(5)
 @cgtest sum_tuple(5.5)
@@ -106,7 +105,6 @@ function an_if(x)
     return x == 3 ? 4 : 5
 end
 
-verify(codegen(an_if, Tuple{Int}))
 @cgtest an_if(3)
 @cgtest an_if(5)
 
@@ -119,8 +117,6 @@ end
 
 println("an_if2")
 
-verify(codegen(an_if2, Tuple{Int}))
-mod = codegen(an_if2, Tuple{Int})
 @cgtest an_if2(5)
 @cgtest an_if2(1)
 
@@ -135,9 +131,6 @@ function ifs(x)
     end
     return x+2
 end
-verify(codegen(ifs, Tuple{Int}))
-mod = codegen(ifs, Tuple{Int})
-
 
 @cgtest ifs(0)
 @cgtest ifs(5)
@@ -148,6 +141,7 @@ mod = codegen(ifs, Tuple{Int})
 @cgtest ifs(7.0)
 @cgtest ifs(8.0)
 
+
 function ifs2(x) 
     if x > 3
         z = 2x
@@ -157,10 +151,11 @@ function ifs2(x)
     return z+2
 end
 
-verify(codegen(ifs2, Tuple{Int}))
 @cgtest ifs2(5)
 @cgtest ifs2(3)
 @cgtest ifs2(1)
+
+
 function while_loop(i) 
     x = 5
     while i < 4
@@ -170,8 +165,8 @@ function while_loop(i)
     return x
 end
 
-mod = codegen(while_loop, Tuple{Int})
 @cgtest while_loop(0)
+
 
 function for_loop(x)
     a = 3
@@ -181,10 +176,8 @@ function for_loop(x)
     x
 end
 
-verify(codegen(for_loop, Tuple{Int}))
-mod = codegen(for_loop, Tuple{Int})
-# optimize!(mod)
 @cgtest for_loop(2)
+codegen(for_loop, Tuple{Float64})
 # @cgtest for_loop(2.2)
 
 
@@ -194,38 +187,31 @@ function call_another(x)
     return x + y
 end
 
-verify(codegen(call_another, Tuple{Int}))
 @cgtest call_another(3)
-
 
 
 function check_identity(x) 
     return x === 3
 end
 
-# verify(codegen(check_identity, Tuple{Int}))
+# codegen(check_identity, Tuple{Int})
+
 
 function do_ccall(x) 
     return ccall(:myccall, Int, (Int,), 1)
 end
 
-verify(codegen(do_ccall, Tuple{Int}))
+codegen(do_ccall, Tuple{Int})
+
 
 make_string(x) = string(1, x, "asdf")
 
-# verify(codegen(make_string, Tuple{Int}))
+# codegen(make_string, Tuple{Int})
+
 
 function array_max2(x) 
     return maximum([3,x])
 end
 
-# verify(codegen(array_max2, Tuple{Int}))
-# verify(codegen(array_max2, Tuple{Float64}))
-
-z = codegen(while_loop, Tuple{Int})
-optimize!(z)
-write(z, "ex.bc")
-
-
-
-
+# codegen(array_max2, Tuple{Int})
+# codegen(array_max2, Tuple{Float64})

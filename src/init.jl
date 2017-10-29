@@ -262,7 +262,8 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
     if haskey(cg.datatype, JT)
         return LLVM.load!(cg.builder, cg.datatype[JT])
     end
-    
+    name = string(JT)
+    @debug "$(cg.name): emitting new type: $name"
     lname = emit_symbol!(cg, JT.name)
     mod = LLVM.load!(cg.builder, cg.extern[:jl_main_module_g])
     super = load_and_emit_datatype!(cg, JT.super)

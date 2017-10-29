@@ -156,8 +156,8 @@ function codegen!(cg::CodeCtx)
         @debug "$(cg.name): node $i/$(length(ci.code))" node
         codegen!(cg, node)
     end
-    # LLVM.verify(func)
-    # LLVM.dispose(cg.builder)  # ?? something different for multiple funs 
+    LLVM.verify(func)
+    LLVM.dispose(cg.builder)
     return cg.mod
 end
 
@@ -263,17 +263,6 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     if haskey(LLVM.functions(cg.mod), name)
         func = LLVM.functions(cg.mod)[name]
     else
-        # if isa(args[1], Core.MethodInstance)
-        #     mi = args[1]
-        #     ci = Core.Inference.retrieve_code_info(mi)
-        #     dt = mi.rettype
-        #     argtypes = Tuple{mi.specTypes.parameters[2:end]...}
-        # else  # method
-        #     m = args[1]
-        #     fun = eval(getfield(m.module, m.name))
-        #     argtypes = Tuple{m.sig.parameters[2:end]...}
-        #     ci, dt = code_typed(fun, argtypes, optimize = true)[1]
-        # end
         argtypes = getargtypes(args[1])
         fun = eval(getname(args[1]))
         ci, dt = code_typed(fun, argtypes, optimize = true)[1]
