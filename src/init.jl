@@ -2,13 +2,13 @@
 # Sets up global values for LLVM types, Julia types, external declarations, and other utilities.
 # 
 
-# const ctx = LLVM.Context(convert(LLVM.API.LLVMContextRef, cglobal(:jl_LLVMContext, Void)))
-const ctx = LLVM.GlobalContext()
+const ctx = LLVM.Context(convert(LLVM.API.LLVMContextRef, cglobal(:jl_LLVMContext, Void)))
+# const ctx = LLVM.GlobalContext()
 
 # Convert a Julia type to an LLVM type
 # Note that LLVM.llvmtype returns the LLVM type of an LLVM value (could combine?)
-# llvmtype(x) = 
-#     LLVMType(ccall(:julia_type_to_llvm, LLVM.API.LLVMTypeRef, (Any, Bool), x, false))
+llvmtype(x) = 
+    LLVMType(ccall(:julia_type_to_llvm, LLVM.API.LLVMTypeRef, (Any, Bool), x, false))
     
 #
 # Includes some external definitions to functions and constants in julia.h
@@ -17,10 +17,10 @@ const ctx = LLVM.GlobalContext()
 #
 # Types
 # 
-# const jl_value_t_ptr = llvmtype(Any)
-# const jl_value_t = eltype(jl_value_t_ptr)
-const jl_value_t = LLVM.StructType("jl_value_t", ctx)
-const jl_value_t_ptr = LLVM.PointerType(jl_value_t)
+const jl_value_t_ptr = llvmtype(Any)
+const jl_value_t = eltype(jl_value_t_ptr)
+# const jl_value_t = LLVM.StructType("jl_value_t", ctx)
+# const jl_value_t_ptr = LLVM.PointerType(jl_value_t)
 const jl_value_t_ptr_ptr = LLVM.PointerType(jl_value_t_ptr)
 # cheat on these for now:
 const jl_datatype_t_ptr = jl_value_t_ptr
@@ -44,7 +44,7 @@ const tmap = Dict{Type,LLVM.LLVMType}(
     Float32 => LLVM.FloatType(ctx),
     Float64 => LLVM.DoubleType(ctx)
 )
-llvmtype(x) = get(tmap, x, jl_value_t_ptr)
+# llvmtype(x) = get(tmap, x, jl_value_t_ptr)
 
 
 const bool_t  = llvmtype(Bool)

@@ -30,29 +30,30 @@ function optimize!(mod::LLVM.Module)
     return nothing
 end
 
-function run(fun, args...)
+export @jitrun
+macro jitrun(fun, args...)
+    quote
+        innerfun() = $(esc(fun))($(esc(args...)))
+        _jitrun(innerfun)
+    end
+end
+function _jitrun(fun)
     # LLVM.@apicall(:LLVMLinkInJIT,LLVM.API.LLVMBool,())
     LLVM.API.LLVMInitializeNativeTarget()
-    tt = Tuple{(typeof(a) for a in args)...}
-    mod = codegen(fun, tt)
+    mod = codegen(fun, Tuple{})
     optimize!(mod)
-    ci = code_typed(fun, tt)
+    ci = code_typed(fun, Tuple{})
     restype = last(last(ci))
     funname = string(fun)
     res_jl = 0
-    # LLVM.Interpreter(mod) do engine
-    # LLVM.JIT(mod) do engine    # This gives wrong answers with JIT and with ExecutionEngine
-    LLVM.ExecutionEngine(mod) do engine
+    LLVM.JIT(mod) do engine
+        # LLVM.JIT() won't work with arbitrary inputs.
+        # See https://github.com/maleadt/LLVM.jl/issues/21
         if !haskey(LLVM.functions(engine), funname)
             error("did not find $funname function in module")
         end
         f = LLVM.functions(engine)[funname]
-        llvmargs = [LLVM.GenericValue(llvmtype(typeof(a)), a) for a in args]
-        if length(args) > 0
-            res = LLVM.run(engine, f, llvmargs)
-        else
-            res = LLVM.run(engine, f)
-        end
+        res = LLVM.run(engine, f)
         if restype <: Integer
             res_jl = convert(restype, res)
         elseif restype <: AbstractFloat
@@ -65,6 +66,24 @@ function run(fun, args...)
     return res_jl
 end
 
+export @jlrun
+macro jlrun(fun, args...)
+    CodeGen._jlrun(fun, args...)
+end
+function _jlrun(fun, args...)
+    quote
+        efun = $(esc(fun))
+        eargs = $(esc(args))
+        tt = Tuple{(typeof(a) for a in eargs)...}
+        mod = codegen(efun, tt)
+        optimize!(mod)
+        ci = code_typed(efun, tt)
+        restype = last(last(ci))
+        funname = string(efun)
+        innerfun() = Base.llvmcall(LLVM.ref(functions(mod)[funname]), restype, tt, $(esc(args...)))
+        innerfun()
+    end
+end
 
 
 function Base.write(mod::LLVM.Module, path::String)
