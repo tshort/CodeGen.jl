@@ -156,7 +156,7 @@ function codegen!(cg::CodeCtx)
         @debug "$(cg.name): node $i/$(length(ci.code))" node
         codegen!(cg, node)
     end
-    LLVM.verify(func)
+    # LLVM.verify(cg.func)
     LLVM.dispose(cg.builder)
     return cg.mod
 end
@@ -263,9 +263,17 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     if haskey(LLVM.functions(cg.mod), name)
         func = LLVM.functions(cg.mod)[name]
     else
+        global MI = args[1]
         argtypes = getargtypes(args[1])
-        fun = eval(getname(args[1]))
-        ci, dt = code_typed(fun, argtypes, optimize = true)[1]
+        @debug "$(cg.name): invoking $name" args argtypes
+        if isa(args[1], Core.MethodInstance) && args[1].inferred != nothing
+            MI = args[1]
+            ci = Base.uncompressed_ast(MI.def, MI.inferred)
+            dt = MI.rettype
+        else
+            fun = eval(getname(args[1]))
+            ci, dt = code_typed(fun, argtypes, optimize = true)[1]
+        end
         newcg = CodeCtx(cg, name, ci, dt, argtypes)
         codegen!(newcg)
         func = newcg.func
