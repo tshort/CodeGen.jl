@@ -265,7 +265,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     else
         global MI = args[1]
         argtypes = getargtypes(args[1])
-        @debug "$(cg.name): invoking $name" args argtypes
+        @debug "$(cg.name): invoking $name" argtypes
         if isa(args[1], Core.MethodInstance) && args[1].inferred != nothing
             MI = args[1]
             ci = Base.uncompressed_ast(MI.def, MI.inferred)

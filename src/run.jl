@@ -31,6 +31,8 @@ function optimize!(mod::LLVM.Module)
 end
 
 function run(fun, args...)
+    # LLVM.@apicall(:LLVMLinkInJIT,LLVM.API.LLVMBool,())
+    LLVM.API.LLVMInitializeNativeTarget()
     tt = Tuple{(typeof(a) for a in args)...}
     mod = codegen(fun, tt)
     optimize!(mod)
@@ -38,8 +40,9 @@ function run(fun, args...)
     restype = last(last(ci))
     funname = string(fun)
     res_jl = 0
+    # LLVM.Interpreter(mod) do engine
     # LLVM.JIT(mod) do engine    # This gives wrong answers with JIT and with ExecutionEngine
-    LLVM.Interpreter(mod) do engine
+    LLVM.ExecutionEngine(mod) do engine
         if !haskey(LLVM.functions(engine), funname)
             error("did not find $funname function in module")
         end

@@ -264,6 +264,9 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
     end
     name = string(JT)
     @debug "$(cg.name): emitting new type: $name"
+    typeof(JT) != DataType && error("Not supported, yet")
+        # JL_DLLEXPORT jl_value_t *jl_type_union(jl_value_t **ts, size_t n);
+
     lname = emit_symbol!(cg, JT.name)
     mod = LLVM.load!(cg.builder, cg.extern[:jl_main_module_g])
     super = load_and_emit_datatype!(cg, JT.super)
