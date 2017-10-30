@@ -39,16 +39,13 @@ end
 # end
 
 array_index(x) = Int[3,2x][2]
-x = @jlrun(array_index, 4)
-y = @jitrun(array_index, 4)
-z = array_index(4)
-@show x,y,z
+@cgtest array_index(2)
 
 array_max(x) = maximum(Int[4,3x])
-show(@jitrun(array_max, 2))
-show(@jitrun(array_max, -1))
-# @test @jitrun(array_max, -1) == array_max(-1)
-println("######################")
+@test @jitrun(array_max, -1) == array_max(-1)
+@cgtest array_max(2)
+@cgtest array_max(-1)
+
 
 function variables(i) 
     i = 2i
@@ -80,7 +77,7 @@ optimize!(mod)
 fx(x) = 2x + 50
 mod = codegen(fx, Tuple{Int})
 optimize!(mod)
-# @test @jitrun(fx, 10) == fx(10)
+@test @jitrun(fx, 10) == fx(10)
 # @test @jlrun(fx, 10) == fx(10)
 # The following is the same test:
 @cgtest fx(10)
