@@ -352,7 +352,7 @@ codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1
 # ccall
 #
 function codegen!(cg::CodeCtx, ::Val{:foreigncall}, args, typ)
-    name = args[1].value
+    name = nameof(args[1])
     if haskey(cg.extern, name)
         func = cg.extern[name]
     else
@@ -365,6 +365,9 @@ function codegen!(cg::CodeCtx, ::Val{:foreigncall}, args, typ)
     
     return LLVM.call!(cg.builder, func, llvmargs)
 end
+nameof(x::QuoteNode) = Symbol(x.value)
+nameof(x::String) = Symbol(x)
+nameof(x) = x
 
 function codegen!(cg::CodeCtx, ::Val{:extcall}, name, rettype, args)
     llvmargs = LLVM.Value[]
