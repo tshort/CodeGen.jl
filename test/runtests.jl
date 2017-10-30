@@ -95,8 +95,8 @@ abs_fun(x) = abs(x)
 z = codegen(abs_fun, Tuple{Float64})
 optimize!(z)
 verify(z)
-# @cgtest abs_fun(-10.0)   #  unknown external function: llvm.fabs
-# @cgtest abs_fun(10.0)
+@cgtest abs_fun(-10.0)
+@cgtest abs_fun(10.0)
 # @cgtest abs_fun(-10)
 
 

@@ -61,17 +61,27 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :or_int   && return LLVM.or!(cg.builder, args[1], args[2])
     name == :xor_int  && return LLVM.xor!(cg.builder, args[1], args[2])
 
-
-    a1(name) = LLVM.call!(cg.builder, LLVM.Function(cg.mod, name, LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
+    function ltyp(x)
+        res = string(LLVM.llvmtype(x))
+        if res == "double"
+            res = "f64"
+        elseif res == "float"
+            res = "f32"
+        end
+        return res
+    end
+    a1(name) = LLVM.call!(cg.builder, 
+        LLVM.Function(cg.mod, "llvm.$name.$(ltyp(args[1]))", 
+                      LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
     # 
-    name == :bswap_int && return a1("llvm.bswap")
-    name == :ctpop_int && return a1("llvm.ctpop")
-    name == :abs_float && return a1("llvm.fabs")
-    name == :ceil_llvm && return a1("llvm.ceil")
-    name == :floor_llvm && return a1("llvm.floor")
-    name == :trunc_llvm && return a1("llvm.trunc")
-    name == :rint_llvm && return a1("llvm.rint")
-    name == :sqrt_llvm && return a1("llvm.sqrt")
+    name == :bswap_int  && return a1("bswap")
+    name == :ctpop_int  && return a1("ctpop")
+    name == :abs_float  && return a1("fabs")
+    name == :ceil_llvm  && return a1("ceil")
+    name == :floor_llvm && return a1("floor")
+    name == :trunc_llvm && return a1("trunc")
+    name == :rint_llvm  && return a1("rint")
+    name == :sqrt_llvm  && return a1("sqrt")
 
     # ctlz_int
     # cttz_int
