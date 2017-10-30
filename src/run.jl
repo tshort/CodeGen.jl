@@ -36,19 +36,7 @@ macro jitrun(fun, args...)
         $innerfun() = $(esc(fun))($(esc(args...)))
         _jitrun($innerfun)
     end
-    # funname = gensym(fun)
-    # quote
-    #     $(esc(funname))() = $(esc(fun))($(esc(args...)))
-    #     _jitrun($(esc(funname)))
-    # end
 end
-# macro jitrun(fun, args...)
-#     funname = gensym(fun)
-#     esc(quote
-#         $funname() = $fun(($args...))
-#         CodeGen._jitrun($funname)
-#     end)
-# end
 function _jitrun(fun)
     # LLVM.@apicall(:LLVMLinkInJIT,LLVM.API.LLVMBool,())
     LLVM.API.LLVMInitializeNativeTarget()

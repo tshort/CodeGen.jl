@@ -31,6 +31,7 @@ function _cgtest(e)
     end
 end
 
+
 ## Something like the following should work (but broken):
 # macro cgtest(e)
 #     f = e.args[1]
@@ -43,7 +44,8 @@ end
 
 array_index(x) = Int[3,2x][2]
 @cgtest array_index(2)
-
+println("***")
+println(@jlrun(array_index, 2))
 
 array_max(x) = maximum(Int[4,3x])
 @test @jitrun(array_max, -1) == array_max(-1)
@@ -83,7 +85,6 @@ fx(x) = 2x + 50
 mod = codegen(fx, Tuple{Int})
 optimize!(mod)
 @test @jitrun(fx, 10) == fx(10)
-# @test @jlrun(fx, 10) == fx(10)
 # The following is the same test:
 @cgtest fx(10)
 @cgtest fx(10.0)
