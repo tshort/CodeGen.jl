@@ -30,6 +30,8 @@ function _cgtest(e)
         @test $(esc(e)) == CodeGen._jitrun($(funname))
     end
 end
+
+## Something like the following should work (but broken):
 # macro cgtest(e)
 #     f = e.args[1]
 #     args = length(e.args) > 1 ? e.args[2:end] : Any[]
@@ -38,8 +40,10 @@ end
 #     end
 # end
 
+
 array_index(x) = Int[3,2x][2]
 @cgtest array_index(2)
+
 
 array_max(x) = maximum(Int[4,3x])
 @test @jitrun(array_max, -1) == array_max(-1)
@@ -71,7 +75,8 @@ end
 f() = 99.0
 mod = codegen(f, Tuple{})
 optimize!(mod)
-# @show CodeGen.run(f)     # Not sure why this doesn't work
+# @cgtest f()                # both @cgtest and @jitrun are broken with no args
+# @test f() == @jitrun(f)
 
 
 fx(x) = 2x + 50
