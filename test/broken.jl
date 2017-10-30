@@ -19,6 +19,17 @@ codegen(sin, Tuple{Float64})
 
 
 
+function type_unstable()
+    x=1
+    for i = 1:10
+      x = x/2
+    end
+    return x
+end
+@cgtest type_unstable()
+
+
+
 function test_arrays(x)
     y = fill(2pi, 5)
     push!(y, 3x)
@@ -58,9 +69,4 @@ function diffeq()
     return 1
 end
 codegen(diffeq)
-
-
-
-
-
 

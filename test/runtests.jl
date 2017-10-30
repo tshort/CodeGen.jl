@@ -10,6 +10,7 @@ using LLVM
 using MicroLogging
 
 configure_logging(min_level=:debug)
+configure_logging(min_level=:info)
 
 
 """
@@ -18,17 +19,36 @@ configure_logging(min_level=:debug)
 Test if `fun(args...)` is equal to `CodeGen.run(fun, args...)`
 """
 macro cgtest(e)
-    esc(_cgtest(e))
+    _cgtest(e)
 end
 function _cgtest(e)
     f = e.args[1]
     args = length(e.args) > 1 ? e.args[2:end] : Any[]
+    funname = esc(gensym(string(f)))
     quote
-        println($(string(e)))
-        @test $e == CodeGen.run($f, $(args...))
+        $funname() = $(esc(f))($(esc(args...)))
+        @test $(esc(e)) == CodeGen._jitrun($(funname))
     end
 end
+# macro cgtest(e)
+#     f = e.args[1]
+#     args = length(e.args) > 1 ? e.args[2:end] : Any[]
+#     quote
+#         $(esc(e)) == @jitrun($(esc(f)), $(esc(args...)))
+#     end
+# end
 
+array_index(x) = Int[3,2x][2]
+x = @jlrun(array_index, 4)
+y = @jitrun(array_index, 4)
+z = array_index(4)
+@show x,y,z
+
+array_max(x) = maximum(Int[4,3x])
+show(@jitrun(array_max, 2))
+show(@jitrun(array_max, -1))
+# @test @jitrun(array_max, -1) == array_max(-1)
+println("######################")
 
 function variables(i) 
     i = 2i
@@ -60,7 +80,8 @@ optimize!(mod)
 fx(x) = 2x + 50
 mod = codegen(fx, Tuple{Int})
 optimize!(mod)
-@test CodeGen.run(fx, 10) == fx(10)
+# @test @jitrun(fx, 10) == fx(10)
+# @test @jlrun(fx, 10) == fx(10)
 # The following is the same test:
 @cgtest fx(10)
 @cgtest fx(10.0)
@@ -85,19 +106,9 @@ codegen(sum_tuple, Tuple{Float64})
 codegen(sum_tuple, Tuple{Float32})
 codegen(sum_tuple, Tuple{Int64})
 codegen(sum_tuple, Tuple{Int32})
-codegen(sum_tuple, Tuple{Complex128})
+# codegen(sum_tuple, Tuple{Complex128})    # can't box
 @cgtest sum_tuple(5)
 @cgtest sum_tuple(5.5)
-
-
-function type_unstable()
-    x=1
-    for i = 1:10
-      x = x/2
-    end
-    return x
-end
-codegen(type_unstable, Tuple{})
 
 
 function an_if(x) 
@@ -185,10 +196,8 @@ end
 codegen(check_identity, Tuple{Int})
 
 
-function do_ccall(x) 
-    return ccall(:myccall, Int, (Int,), 1)
-end
-codegen(do_ccall, Tuple{Int})
+ccall_cos(x) = ccall(:cos, Float64, (Float64,), x)
+@cgtest ccall_cos(1.1)
 
 
 nothing

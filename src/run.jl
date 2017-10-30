@@ -2,7 +2,7 @@
 # Bitcode optimization and running utilities.
 # 
 
-export optimize!, run
+export optimize!, @jitrun, @jlrun
 
 """
     optimize!(mod::LLVM.Module)
@@ -30,13 +30,25 @@ function optimize!(mod::LLVM.Module)
     return nothing
 end
 
-export @jitrun
 macro jitrun(fun, args...)
+    innerfun = gensym(fun)
     quote
-        innerfun() = $(esc(fun))($(esc(args...)))
-        _jitrun(innerfun)
+        $innerfun() = $(esc(fun))($(esc(args...)))
+        _jitrun($innerfun)
     end
+    # funname = gensym(fun)
+    # quote
+    #     $(esc(funname))() = $(esc(fun))($(esc(args...)))
+    #     _jitrun($(esc(funname)))
+    # end
 end
+# macro jitrun(fun, args...)
+#     funname = gensym(fun)
+#     esc(quote
+#         $funname() = $fun(($args...))
+#         CodeGen._jitrun($funname)
+#     end)
+# end
 function _jitrun(fun)
     # LLVM.@apicall(:LLVMLinkInJIT,LLVM.API.LLVMBool,())
     LLVM.API.LLVMInitializeNativeTarget()
@@ -44,7 +56,7 @@ function _jitrun(fun)
     optimize!(mod)
     ci = code_typed(fun, Tuple{})
     restype = last(last(ci))
-    funname = string(fun)
+    funname = string(first(methods(fun)).name)
     res_jl = 0
     LLVM.JIT(mod) do engine
         # LLVM.JIT() won't work with arbitrary inputs.

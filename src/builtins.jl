@@ -21,8 +21,24 @@ function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
     T <: Base.BitInteger && return emit_box!(cg, T, v)
     T <: Base.IEEEFloat  && return emit_box!(cg, T, v)
     T == Bool            && return emit_box!(cg, T, v)
-    T == SSAValue        && return emit_box!(cg, T, codegen!(cg, x.id))
-    T == SlotNumber      && return emit_box!(cg, T, codegen!(cg, x.id))
+    # T == SSAValue        && return emit_box!(cg, T, codegen!(cg, x.id))
+    # T == SlotNumber      && return emit_box!(cg, T, codegen!(cg, x.id))
+    if T == SlotNumber 
+        slottype = cg.code_info.slottypes[x.id]
+        if isbits(slottype) 
+            return emit_box!(cg, slottype, v)
+        else
+            return v
+        end
+    end
+    if T == SSAValue
+        ssatype = cg.code_info.ssavaluetypes[x.id]
+        if isbits(eltype(ssatype)) # This eltype seems wrong. I don't understand ssavaluetypes.
+            return emit_box!(cg, eltype(ssatype), v) 
+        else
+            return v
+        end
+    end
     if T == Expr
         if isbits(x.typ) 
             return emit_box!(cg, x.typ, v)

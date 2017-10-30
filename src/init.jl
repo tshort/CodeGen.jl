@@ -98,8 +98,8 @@ function setup_externs!(mod)
     end
     e[:jl_box_bool]  = extern!(mod, "jl_box_bool", jl_value_t_ptr, LLVMType[uint8_t])
     e[:jl_unbox_bool]  = extern!(mod, "jl_unbox_bool", uint8_t, LLVMType[jl_value_t_ptr])
-    e[:jl_box_ssavalue]  = extern!(mod, "jl_ssavalue", jl_value_t_ptr, LLVMType[size_t])
-    e[:jl_box_slotnumber]  = extern!(mod, "jl_slotnumber", jl_value_t_ptr, LLVMType[size_t])
+    e[:jl_box_ssavalue]  = extern!(mod, "jl_box_ssavalue", jl_value_t_ptr, LLVMType[size_t])
+    e[:jl_box_slotnumber]  = extern!(mod, "jl_box_slotnumber", jl_value_t_ptr, LLVMType[size_t])
     
     e[:jl_apply_array_type] = extern!(mod, "jl_apply_array_type", jl_value_t_ptr, LLVMType[jl_value_t_ptr, int32_t])
     e[:jl_new_struct_uninit] = extern!(mod, "jl_new_struct_uninit", jl_value_t_ptr, LLVMType[jl_datatype_t_ptr])
