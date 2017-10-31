@@ -306,13 +306,15 @@ function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
 end
 
 #
-# Constants and types
+# Constants
 #
+
 codegen!(cg::CodeCtx, x::T) where T <: Base.IEEEFloat =
     LLVM.ConstantFP(llvmtype(T), x)
 
 codegen!(cg::CodeCtx, x::T) where T <: Base.BitInteger =
     LLVM.ConstantInt(llvmtype(T), x)
+
 
 codegen!(cg::CodeCtx, x::Bool) =
     LLVM.ConstantInt(bool_t, Int8(x))
@@ -323,18 +325,6 @@ function codegen!(cg::CodeCtx, s::String)
     return LLVM.call!(cg.builder, cg.extern[:jl_pchar_to_string], LLVM.Value[gs, codegen!(cg, Int32(length(s)+1))])
 end
 
-# I'm not sure these are appropriate:
-codegen!(cg::CodeCtx, ::Type{T}) where T <: Base.IEEEFloat =
-    llvmtype(T)
-
-codegen!(cg::CodeCtx, ::Type{T}) where T <: Base.BitInteger =
-    llvmtype(T)
-
-# The following creates the appropriate structures in memory
-function codegen!(cg::CodeCtx, ::Type{Array{T,N}}) where {T,N}
-    typ = LLVM.load!(cg.builder, cg.datatype[T])
-    return LLVM.call!(cg.builder, cg.extern[:jl_apply_array_type], LLVM.Value[typ, codegen!(cg, UInt32(N))])
-end
 
 #
 # Miscellaneous
@@ -439,3 +429,59 @@ function codegen!(cg::CodeCtx, ::Val{:new}, args, typ)
     return res
 end
 
+
+#
+# Types - emit and return a stored type or create a new type and store it
+#
+
+# I'm not sure these are appropriate:
+
+# The following creates the appropriate structures in memory
+function codegen!(cg::CodeCtx, ::Type{Array{T,N}}) where {T,N}
+    typ = LLVM.load!(cg.builder, cg.datatype[T])
+    return LLVM.call!(cg.builder, cg.extern[:jl_apply_array_type], LLVM.Value[typ, codegen!(cg, UInt32(N))])
+end
+
+codegen!(cg::CodeCtx, x::Type{T}) where T = load_and_emit_datatype!(cg, x)
+
+
+function load_and_emit_datatype!(cg, ::Type{JT}) where JT
+    if haskey(cg.datatype, JT)
+        return LLVM.load!(cg.builder, cg.datatype[JT])
+    end
+    name = string(JT)
+    @debug "$(cg.name): emitting new type: $name"
+    typeof(JT) != DataType && error("Not supported, yet")
+        # JL_DLLEXPORT jl_value_t *jl_type_union(jl_value_t **ts, size_t n);
+
+    lname = emit_symbol!(cg, JT.name)
+    mod = LLVM.load!(cg.builder, cg.extern[:jl_main_module_g])
+    super = load_and_emit_datatype!(cg, JT.super)
+    params = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
+        LLVM.Value[codegen!(cg, length(JT.parameters)), [load_and_emit_datatype!(cg, t) for t in JT.parameters]...])
+    if !isconcrete(JT)
+        dt = LLVM.call!(cg.builder, cg.extern[:jl_new_abstracttype], LLVM.Value[lname, mod, super, params])
+    else
+        fnames = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
+            LLVM.Value[codegen!(cg, length(fieldnames(JT))), [emit_symbol!(cg, s) for s in fieldnames(JT)]...])
+        ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
+            LLVM.Value[codegen!(cg, length(JT.types)), [load_and_emit_datatype!(cg, t) for t in JT.types]...])
+        abstrct = codegen!(cg, UInt32(JT.abstract))
+        mutabl = JT.mutable ? codegen!(cg, UInt32(1)) : codegen!(cg, UInt32(0))
+        ninitialized = codegen!(cg, UInt32(JT.ninitialized))
+        dt = LLVM.call!(cg.builder, cg.extern[:jl_new_datatype], 
+            LLVM.Value[lname, mod, super, params, fnames, ftypes, abstrct, mutabl, ninitialized])
+            # LLVMType[jl_sym_t_ptr, jl_module_t_ptr, jl_datatype_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, int32_t, int32_t, int32_t])
+    end
+    loc = LLVM.GlobalVariable(cg.mod, jl_datatype_t_ptr, string(JT))
+    sdt = LLVM.store!(cg.builder, dt, loc)
+    cg.datatype[JT] = sdt
+    return LLVM.load!(cg.builder, loc)
+end
+
+load_and_emit_datatype!(cg, x::GlobalRef) = load_and_emit_datatype!(cg, eval(x))
+
+load_and_emit_datatype!(cg, x) = codegen!(cg, x)
+
+emit_symbol!(cg, x) =
+    LLVM.call!(cg.builder, cg.extern[:jl_symbol], [globalstring_ptr!(cg.builder, string(x))])

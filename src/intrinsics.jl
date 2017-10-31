@@ -2,10 +2,14 @@
 # Code generation for intrinsic functions.
 # 
 
+make_intrinsic_arg!(cg, x) = codegen!(cg, x)
+make_intrinsic_arg!(cg, x::Type{T}) where {T} = llvmtype(x)
+make_intrinsic_arg!(cg, x::GlobalRef) = make_intrinsic_arg!(cg, eval(x))
+
 function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     args = Any[]
     for v in jlargs
-        push!(args, codegen!(cg, v))
+        push!(args, make_intrinsic_arg!(cg, v))
     end
     name == :neg_int  && return LLVM.neg!(cg.builder, args[1])
     name == :add_int  && return LLVM.add!(cg.builder, args[1], args[2])

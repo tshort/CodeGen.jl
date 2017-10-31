@@ -19,7 +19,7 @@ function test_arrays(x)
     zz = y .+ z.^2
     return maximum(zz)
 end
-codegen(test_arrays, Tuple{Float64})  
+codegen(test_arrays, Tuple{Float64})   # Segfaults about half way through 
    
 
 
