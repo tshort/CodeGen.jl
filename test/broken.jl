@@ -12,12 +12,21 @@ configure_logging(min_level=:debug)
 codegen(Base.throw_inexacterror, Tuple{Symbol, Type{Int}, Int})
 
 
-array_max2(x) = maximum([3,x])
-@cgtest array_max2(1)   # Segfaults...
-@cgtest array_max2(4)
-@cgtest array_max2(1.0)
-@cgtest array_max2(4.0)
+function test_arrays(x)
+    y = fill(2pi, 5)
+    push!(y, 3x)
+    z = reverse(y)
+    zz = y .+ z.^2
+    return maximum(zz)
+end
+codegen(test_arrays, Tuple{Float64})  
+   
 
+
+array_max2(x) = maximum([3,x])
+codegen(array_max2, Tuple{Int})     # This passes & verifies
+# @cgtest array_max2(1)               # Segfaults...
+codegen(array_max2, Tuple{Float64}) # no method matching emit_box!(::CodeGen.CodeCtx, ::Type{Tuple{Int64,Float64}}, ::LLVM.LoadInst)  
 
 
 function test_arrays(x)
