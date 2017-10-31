@@ -242,9 +242,10 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
         @debug "$(cg.name): calling builtin: $name"
         return emit_unbox!(cg, emit_builtin!(cg, args[1].name, args[2:end]), typ)
     end
-    @debug "$(cg.name): calling other method: $name"
+    @debug "$(cg.name): calling other method: $name" args
     ## NOTE: everything past here may be wrong!
     argstypetuple = Tuple{(gettypes(cg, a) for a in args[2:end])...}
+    @debug "$(cg.name): more info" argstypetuple
     # argstypetuple = Tuple{(Any for a in args[2:end])...}
     method = which(eval(args[1]), argstypetuple)
     codegen!(cg, Val(:invoke), Any[method, args[2:end]...], typ)
@@ -253,6 +254,7 @@ end
 gettypes(cg::CodeCtx, x::SlotNumber) = cg.code_info.slottypes[x.id]
 # gettypes(cg::CodeCtx, x::GlobalRef) = eval(x)
 gettypes(cg::CodeCtx, x::GlobalRef) = Type{Any}
+gettypes(cg::CodeCtx, x::Expr) = Type{Any}
 gettypes(cg::CodeCtx, x) = typeof(x)
 
 
@@ -265,7 +267,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     else
         global MI = args[1]
         argtypes = getargtypes(args[1])
-        @debug "$(cg.name): invoking $name" argtypes
+        @debug "$(cg.name): argtypes" args argtypes
         if isa(args[1], Core.MethodInstance) && args[1].inferred != nothing
             MI = args[1]
             ci = Base.uncompressed_ast(MI.def, MI.inferred)
@@ -279,6 +281,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
         func = newcg.func
     end
     llvmargs = LLVM.Value[]
+    # dump(args)
     for v in args[3:end]
         push!(llvmargs, codegen!(cg, v))
     end
@@ -347,6 +350,8 @@ codegen!(cg::CodeCtx, ::Void) = nothing
 codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
 
 codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1])
+
+codegen!(cg::CodeCtx, ::Val{:simdloop}, args, typ) = (dump(args); nothing)
 
 #
 # ccall

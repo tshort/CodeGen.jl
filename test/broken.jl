@@ -8,25 +8,21 @@ using MicroLogging
 configure_logging(min_level=:debug)
 
 
-# Results in several problems below:
+# Results in several problems below:  codegen of this works now
 codegen(Base.throw_inexacterror, Tuple{Symbol, Type{Int}, Int})
-#  Base.throw_inexacterror: invoking Type                                                                       Info main.jl:262
-# ERROR: BoundsError: attempt to access 0-element Array{Any,1} at index [1]
 
 
 
-codegen(sin, Tuple{Float64})
+array_sum(x) = sum(Int[3,x])
+codegen(array_sum, Tuple{Int}) 
 
 
 
-function type_unstable()
-    x=1
-    for i = 1:10
-      x = x/2
-    end
-    return x
-end
-@cgtest type_unstable()
+array_max2(x) = maximum([3,x])
+@cgtest array_max2(1)
+@cgtest array_max2(4)
+@cgtest array_max2(1.0)
+@cgtest array_max2(4.0)
 
 
 
@@ -37,20 +33,24 @@ function test_arrays(x)
     zz = y .+ z.^2
     return maximum(zz)
 end
-codegen(test_arrays, Tuple{Float64})
+codegen(test_arrays, Tuple{Float64})  
    
-
-array_max2(x) = maximum([3,x])
-codegen(array_max2, Tuple{Int})
-codegen(array_max2, Tuple{Float64})
-
-
-array_sum(x) = sum(Int[3,x])
-codegen(array_sum, Tuple{Int}) # same error as above
-
 
 make_string(x) = string(1, x, "asdf")
 codegen(make_string, Tuple{Int}) # same error as above
+
+
+codegen(sin, Tuple{Float64})
+
+
+function type_unstable(x)
+    for i = 1:10
+      x = x/2
+    end
+    return x
+end
+codegen(type_unstable, Tuple{Int})
+# @jitrun(type_unstable, 1)   # segfaults
 
 
 

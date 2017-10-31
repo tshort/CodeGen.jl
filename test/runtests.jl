@@ -100,10 +100,6 @@ verify(z)
 # @cgtest abs_fun(-10)
 
 
-array_max(x) = maximum(Int[3,x])
-codegen(array_max, Tuple{Int})
-
-
 sum_tuple(x) = sum((x, x, 1.0))
 codegen(sum_tuple, Tuple{Float64})
 codegen(sum_tuple, Tuple{Float32})
@@ -112,6 +108,11 @@ codegen(sum_tuple, Tuple{Int32})
 # codegen(sum_tuple, Tuple{Complex128})    # can't box
 @cgtest sum_tuple(5)
 @cgtest sum_tuple(5.5)
+
+
+array_max(x) = maximum(Int[3,x])
+@cgtest array_max(1)
+@cgtest array_max(4)
 
 
 function an_if(x) 
