@@ -12,14 +12,8 @@ configure_logging(min_level=:debug)
 codegen(Base.throw_inexacterror, Tuple{Symbol, Type{Int}, Int})
 
 
-
-array_sum(x) = sum(Int[3,x])
-codegen(array_sum, Tuple{Int}) 
-
-
-
 array_max2(x) = maximum([3,x])
-@cgtest array_max2(1)
+@cgtest array_max2(1)   # Segfaults...
 @cgtest array_max2(4)
 @cgtest array_max2(1.0)
 @cgtest array_max2(4.0)

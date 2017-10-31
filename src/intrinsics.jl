@@ -108,6 +108,7 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :not_int      && return LLVM.not!(cg.builder, args[1])
     name == :shl_int  && return LLVM.shl!(cg.builder, args[1], args[2])    # WRONG - FIX
     name == :lshr_int  && return LLVM.lshr!(cg.builder, args[1], args[2])    # WRONG - FIX
+    name == :ashr_int  && return LLVM.ashr!(cg.builder, args[1], args[2])    # WRONG - FIX
     # if name == :lshr_int
     #     t = LLVM.llvmtype(args[1])
     #     return LLVM.select!(cg.builder, 

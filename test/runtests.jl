@@ -115,6 +115,10 @@ array_max(x) = maximum(Int[3,x])
 @cgtest array_max(4)
 
 
+array_sum(x) = sum(Int[3,x])
+@cgtest array_sum(1)
+
+
 function an_if(x) 
     return x == 3 ? 4 : 5
 end
