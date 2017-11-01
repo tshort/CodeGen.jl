@@ -217,13 +217,11 @@ function codegen!(cg::CodeCtx, f::GlobalRef)
     if isa(evf, Type)
         return codegen!(cg, evf)
     else
-        return emit_box!(cg, Int32(0)) # KLUDGE
+        return emit_box!(cg, Int32(999)) # KLUDGE
     end
 end
 
-function codegen!(cg::CodeCtx, x::QuoteNode) 
-    return emit_box!(cg, Int32(0)) # BROKEN
-end
+codegen!(cg::CodeCtx, x::QuoteNode) = emit_symbol!(cg, x.value)
 
 
 #
@@ -247,7 +245,8 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     argstypetuple = Tuple{(gettypes(cg, a) for a in args[2:end])...}
     @debug "$(cg.name): more info" argstypetuple
     # argstypetuple = Tuple{(Any for a in args[2:end])...}
-    method = which(eval(args[1]), argstypetuple)
+    global method = which(fun, argstypetuple)
+    # codegen!(cg, Val(:invoke), Any[method.specializations.func, args[2:end]...], typ)
     codegen!(cg, Val(:invoke), Any[method, args[2:end]...], typ)
     # error("Function $name not supported.")
 end
@@ -274,6 +273,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
             dt = MI.rettype
         else
             fun = eval(getname(args[1]))
+            dump(fun)
             ci, dt = code_typed(fun, argtypes, optimize = true)[1]
         end
         newcg = CodeCtx(cg, name, ci, dt, argtypes)
@@ -290,6 +290,9 @@ end
 
 getname(x::Core.MethodInstance) = getfield(x.def.module, x.def.name)
 getname(x::Method) = getfield(x.module, x.name)
+# getname(x::Method) = getfield(x.module, getname(x.sig.parameters[1]))
+# getname(::Type{T}) where T = T.parameters[1].name.name
+# getname(::T) where T = T.name.name
 getargtypes(x::Core.MethodInstance) = Tuple{x.specTypes.parameters[2:end]...}
 getargtypes(x::Method) = Tuple{x.sig.parameters[2:end]...}
 
@@ -349,9 +352,12 @@ codegen!(cg::CodeCtx, ::Val{:simdloop}, args, typ) = (dump(args); nothing)
 function codegen!(cg::CodeCtx, ::Val{:foreigncall}, args, typ)
     name = nameof(args[1])
     if haskey(cg.extern, name)
+        @debug "$(cg.name) ccall found: $name"
         func = cg.extern[name]
     else
+        @debug "$(cg.name) ccall creating: $name"
         func = extern!(cg.mod, name, llvmtype(args[2]), llvmtype.(collect(args[3])))
+        cg.extern[name] = func
     end
     llvmargs = LLVM.Value[]
     for v in args[6:end]
@@ -419,14 +425,23 @@ end
 #
 function codegen!(cg::CodeCtx, ::Val{:new}, args, typ)
     dt = load_and_emit_datatype!(cg, args[1])
-    res = LLVM.call!(cg.builder, cg.extern[:jl_new_struct_uninit], [dt])
-    # set the fields
-    for i in 2:length(args)
-        rhs = emit_box!(cg, args[i]) 
-        offset = codegen!(cg, UInt32(i - 1))
-        LLVM.call!(cg.builder, cg.extern[:jl_set_nth_field], LLVM.Value[res, offset, rhs])
+    typ = eval(args[1])
+    if isbits(typ)
+        @debug "$(cg.name): creating bitstype" args
+        llvmstruct = alloca!(cg.builder, llvmtype(typ))
+        for i in 2:length(args)
+            p = LLVM.gep!(cg.builder, llvmstruct, [codegen!(cg, i-2)])
+            LLVM.store!(cg.builder, codegen!(cg, args[i]), p)
+        end
+        return LLVM.call!(cg.builder, cg.extern[:jl_new_bits], LLVM.Value[dt, llvmstruct])
+    else
+        @debug "$(cg.name): creating composite" args
+        llvmargs = LLVM.Value[dt]
+        for a in args[2:end]
+            push!(llvmargs, emit_box!(cg, a))
+        end
+        return LLVM.call!(cg.builder, cg.extern[:jl_new_struct], llvmargs)
     end
-    return res
 end
 
 
@@ -450,7 +465,7 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
         return LLVM.load!(cg.builder, cg.datatype[JT])
     end
     name = string(JT)
-    @debug "$(cg.name): emitting new type: $name"
+    @info "$(cg.name): emitting new type: $name"
     typeof(JT) != DataType && error("Not supported, yet")
         # JL_DLLEXPORT jl_value_t *jl_type_union(jl_value_t **ts, size_t n);
 
@@ -459,24 +474,27 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
     super = load_and_emit_datatype!(cg, JT.super)
     params = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
         LLVM.Value[codegen!(cg, length(JT.parameters)), [load_and_emit_datatype!(cg, t) for t in JT.parameters]...])
-    if !isconcrete(JT)
-        dt = LLVM.call!(cg.builder, cg.extern[:jl_new_abstracttype], LLVM.Value[lname, mod, super, params])
-    else
+    if isconcrete(JT)
         fnames = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
             LLVM.Value[codegen!(cg, length(fieldnames(JT))), [emit_symbol!(cg, s) for s in fieldnames(JT)]...])
         ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
             LLVM.Value[codegen!(cg, length(JT.types)), [load_and_emit_datatype!(cg, t) for t in JT.types]...])
-        abstrct = codegen!(cg, UInt32(JT.abstract))
-        mutabl = JT.mutable ? codegen!(cg, UInt32(1)) : codegen!(cg, UInt32(0))
-        ninitialized = codegen!(cg, UInt32(JT.ninitialized))
-        dt = LLVM.call!(cg.builder, cg.extern[:jl_new_datatype], 
-            LLVM.Value[lname, mod, super, params, fnames, ftypes, abstrct, mutabl, ninitialized])
-            # LLVMType[jl_sym_t_ptr, jl_module_t_ptr, jl_datatype_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, int32_t, int32_t, int32_t])
+    else
+        fnames = ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec], LLVM.Value[codegen!(cg, 0)])
     end
+    abstrct = codegen!(cg, UInt32(JT.abstract))
+    mutabl = JT.mutable ? codegen!(cg, UInt32(1)) : codegen!(cg, UInt32(0))
+    ninitialized = codegen!(cg, UInt32(JT.ninitialized))
+    dt = LLVM.call!(cg.builder, cg.extern[:jl_new_datatype], 
+        LLVM.Value[lname, mod, super, params, fnames, ftypes, abstrct, mutabl, ninitialized])
+        # LLVMType[jl_sym_t_ptr, jl_module_t_ptr, jl_datatype_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, int32_t, int32_t, int32_t])
     loc = LLVM.GlobalVariable(cg.mod, jl_datatype_t_ptr, string(JT))
-    sdt = LLVM.store!(cg.builder, dt, loc)
-    cg.datatype[JT] = sdt
-    return LLVM.load!(cg.builder, loc)
+    LLVM.linkage!(loc, LLVM.API.LLVMCommonLinkage)
+    LLVM.initializer!(loc, null(LLVM.Int64Type(ctx)))
+    LLVM.store!(cg.builder, dt, loc)
+    result = LLVM.load!(cg.builder, loc)
+    cg.datatype[JT] = result
+    return result
 end
 
 load_and_emit_datatype!(cg, x::GlobalRef) = load_and_emit_datatype!(cg, eval(x))
@@ -485,3 +503,4 @@ load_and_emit_datatype!(cg, x) = codegen!(cg, x)
 
 emit_symbol!(cg, x) =
     LLVM.call!(cg.builder, cg.extern[:jl_symbol], [globalstring_ptr!(cg.builder, string(x))])
+

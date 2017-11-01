@@ -3,6 +3,7 @@
 # 
 
 emit_box!(cg::CodeCtx, ::Type{Any}, v) = v
+emit_box!(cg::CodeCtx, ::Type{T}, v) where {T} = v
 
 emit_box!(cg::CodeCtx, ::Type{Bool}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_bool], LLVM.Value[v])
 emit_box!(cg::CodeCtx, ::Type{Int8}, v)  = LLVM.call!(cg.builder, cg.extern[:jl_box_int8], LLVM.Value[v])
@@ -17,6 +18,7 @@ emit_box!(cg::CodeCtx, ::Type{SlotNumber}, v) = LLVM.call!(cg.builder, cg.extern
 function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
     isa(x, Type)         && return cg.datatype[x]
     v = codegen!(cg, x)
+    @debug "$(cg.name): boxing " x v
     T == Any && return v
     T <: Base.BitInteger && return emit_box!(cg, T, v)
     T <: Base.IEEEFloat  && return emit_box!(cg, T, v)
@@ -32,9 +34,10 @@ function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
         end
     end
     if T == SSAValue
-        ssatype = cg.code_info.ssavaluetypes[x.id]
-        if isbits(eltype(ssatype)) # This eltype seems wrong. I don't understand ssavaluetypes.
-            return emit_box!(cg, eltype(ssatype), v) 
+        ssatype = cg.code_info.ssavaluetypes[x.id+1] # I think the first position is a placeholder
+        @debug "$(cg.name): boxing SSAValue $(x.id)" ssatype 
+        if isbits(ssatype)
+            return emit_box!(cg, ssatype, v) 
         else
             return v
         end
