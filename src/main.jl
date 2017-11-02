@@ -101,20 +101,6 @@ function new_scope(f, cg::CodeCtx)
     pop!(current_scope(cg))
 end
 
-function create_entry_block_allocation(cg::CodeCtx, fn::LLVM.Function, typ, varname::String)
-    local alloc
-    LLVM.Builder(ctx) do builder
-        # Set the builder at the start of the function
-        entry_block = LLVM.entry(fn)
-        if isempty(LLVM.instructions(entry_block))
-            LLVM.position!(builder, entry_block)
-        else
-            LLVM.position!(builder, first(LLVM.instructions(entry_block)))
-        end
-        alloc = LLVM.alloca!(builder, typ)
-    end
-    return alloc
-end
 
 """
     codegen(fun, argtypes; optimize_lowering = true, triple = nothing, datalayout = nothing) 
@@ -171,7 +157,6 @@ function codegen!(cg::CodeCtx)
         argname = string(ci.slotnames[i + 1], "_s", i+1)
         if !isa(LLVM.llvmtype(param), LLVM.VoidType)
             alloc = LLVM.alloca!(cg.builder, LLVM.llvmtype(param), argname)
-            # alloc = create_entry_block_allocation(cg, cg.func, LLVM.llvmtype(param), argname)
             LLVM.store!(cg.builder, param, alloc)
             current_scope(cg)[argname] = alloc
         end
