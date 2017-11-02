@@ -14,30 +14,33 @@ configure_logging(min_level=:debug)
 
 
 
-abstract type AbstractMA end
-mutable struct MA <: AbstractMA
-    xx::Int
-    yy::Float64
-end
-@noinline f(x::MA) = x.yy
-function newmdt(x)
-    a = MA(1, x)
-    f(a)
-end
-m = codegen(newmdt, Tuple{Float64})
-@jitrun(newmdt, 1.1) 
-
 abstract type AbstractA end
 struct A <: AbstractA
     xx::Int
     yy::Float64
 end
-@noinline f(x::A) = x.yy
+testf() = 99
+
+cg = CodeGen.CodeCtx_init(testf, Tuple{})
+addr = LLVM.alloca!(cg.builder, CodeGen.llvmtype(A))
+gaddr = LLVM.struct_gep!(cg.builder, addr, 0)
+LLVM.store!(cg.builder, codegen!(cg, 3), gaddr)
+gaddr2 = LLVM.struct_gep!(cg.builder, addr, 1)
+LLVM.store!(cg.builder, codegen!(cg, 2.2), gaddr2)
+v = LLVM.load!(cg.builder, gaddr)
+LLVM.ret!(cg.builder, v)
+verify(cg.mod)
+
+
+
+
+@noinline f(x::A) = x.yy + x.xx
 function newdt(x)
-    a = A(1, x)
+    a = A(3, 2x)
     f(a)
 end
 m = codegen(newdt, Tuple{Float64})
+nothing
 # @jitrun(newdt, 1.1) 
 
 # function test_arrays(x)

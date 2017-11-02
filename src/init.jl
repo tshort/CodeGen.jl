@@ -104,7 +104,7 @@ function setup_externs!(mod)
     e[:jl_apply_array_type] = extern!(mod, "jl_apply_array_type", jl_value_t_ptr, LLVMType[jl_value_t_ptr, int32_t])
     e[:jl_new_struct_uninit] = extern!(mod, "jl_new_struct_uninit", jl_value_t_ptr, LLVMType[jl_datatype_t_ptr])
     e[:jl_new_struct] = extern!(mod, "jl_new_struct", jl_value_t_ptr, LLVMType[jl_datatype_t_ptr], vararg = true)
-    e[:jl_new_bits] = extern!(mod, "jl_new_bits", jl_value_t_ptr, LLVMType[jl_value_t_ptr])
+    e[:jl_new_bits] = extern!(mod, "jl_new_bits", jl_value_t_ptr, LLVMType[jl_value_t_ptr, jl_value_t_ptr])
     e[:jl_set_nth_field] = extern!(mod, "jl_set_nth_field", void_t, LLVMType[jl_value_t_ptr, int32_t, jl_value_t_ptr])
     e[:jl_pchar_to_string] = extern!(mod, "jl_pchar_to_string", jl_value_t_ptr, LLVMType[int8_t_ptr, uint32_t])
     

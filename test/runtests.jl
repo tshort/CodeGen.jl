@@ -208,4 +208,26 @@ ccall_cos(x) = ccall(:cos, Float64, (Float64,), x)
 @cgtest ccall_cos(1.1)
 
 
+abstract type AbstractMA end
+mutable struct MA <: AbstractMA
+    xx::Int
+    yy::Float64
+end
+@noinline f(x::MA) = x.yy
+function newmdt(x)
+    a = MA(1, x)
+    f(a)
+end
+m = codegen(newmdt, Tuple{Float64})
+@cgtest newmdt(1.1) 
+
+
+@noinline f(x::A) = x.yy + x.xx
+function newdt(x)
+    a = A(3, 2x)
+    f(a)
+end
+@cgtest newdt(1.1) 
+
+
 nothing

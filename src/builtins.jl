@@ -68,6 +68,10 @@ function emit_unbox!(cg::CodeCtx, v, ::Type{T}) where T
     return v
 end
 
+Base.isbits(cg, x) = false
+Base.isbits(cg, x::SlotNumber) = isbits(cg.code_info.slottypes[x.id])
+# Base.fieldnames(cg, x) = fieldnames(typeof(x))
+Base.fieldnames(cg, x::SlotNumber) = fieldnames(cg.code_info.slottypes[x.id])
 
 function emit_builtin!(cg::CodeCtx, name, jlargs)
     # contains(string(name), "throw") && return cg.extern[:jl_void_type_g]  # Bail out on errors for now
@@ -80,6 +84,12 @@ function emit_builtin!(cg::CodeCtx, name, jlargs)
             # end
         # end
     end 
+    if name == :getfield && isbits(cg, jlargs[1])
+        @debug "$(cg.name): emitting getfield"
+        v = codegen!(cg, jlargs[1])
+        idx = findfirst(equalto(nameof(jlargs[2])), fieldnames(cg, jlargs[1])) - 1
+        return LLVM.extract_value!(cg.builder, v, idx)
+    end
     # Otherwise default to the C++ versions of these.
     cgnargs = codegen!(cg, UInt32(nargs))
     newargs = LLVM.array_alloca!(cg.builder, jl_value_t_ptr, cgnargs)

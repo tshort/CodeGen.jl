@@ -62,6 +62,36 @@ function CodeCtx(orig_cg::CodeCtx, name, ci::CodeInfo, result_type, argtypes)
     return cg
 end
 
+function CodeCtx(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing)
+    ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    funname = string(Base.function_name(fun))
+    cg = CodeCtx(funname, ci, dt, argtypes)
+    codegen!(cg)
+    return cg
+end
+
+# This is for testing
+function CodeCtx_init(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing)
+    ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    funname = string(Base.function_name(fun))
+    cg = CodeCtx(funname, ci, dt, argtypes)
+    @info "## $(cg.name)"
+    ci = cg.code_info
+    argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
+    for i in 1:length(argtypes)
+        if isa(argtypes[i], LLVM.VoidType)
+            argtypes[i] = int32_t
+        end
+    end
+    func_type = LLVM.FunctionType(llvmtype(cg.result_type), argtypes)
+    cg.func = LLVM.Function(cg.mod, cg.name, func_type)
+    cg.nargs = length(argtypes)
+    LLVM.linkage!(cg.func, LLVM.API.LLVMExternalLinkage)
+    entry = LLVM.BasicBlock(cg.func, "entry", ctx)
+    LLVM.position!(cg.builder, entry)
+    return cg
+end
+
 Base.show(io::IO, cg::CodeCtx) = print(io, "CodeCtx")
 
 current_scope(cg::CodeCtx) = cg.current_scope
@@ -179,6 +209,12 @@ end
 #
 # Variable assignment and reading
 #
+
+# This may need a reorg.
+#  - Sometimes, you may want the pointers for Slots and SSAs. 
+#  - codegen!(cg, v::SlotNumber) returns what?
+#    - If it's an address, then builtins/structs work. But, does that break ints & floats?
+#    - What if it's a struct with address and value?
 function codegen!(cg::CodeCtx, v::SlotNumber) 
     varname = string(cg.code_info.slotnames[v.id], "_s", v.id)
     # cg.slots[v.id]
@@ -186,6 +222,8 @@ function codegen!(cg::CodeCtx, v::SlotNumber)
     V == nothing && error("did not find variable $(varname)")
     return LLVM.load!(cg.builder, V, varname*"_")
 end
+
+codegen!(cg::CodeCtx, v::SSAValue) = cg.ssas[v.id]
 
 function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
     result = codegen!(cg, args[2])
@@ -332,8 +370,6 @@ end
 #
 # Miscellaneous
 #
-codegen!(cg::CodeCtx, v::SSAValue) = cg.ssas[v.id]
-
 codegen!(cg::CodeCtx, ::LineNumberNode) = nothing
 
 codegen!(cg::CodeCtx, ::NewvarNode) = nothing
@@ -424,17 +460,17 @@ end
 # New - structure creation
 #
 function codegen!(cg::CodeCtx, ::Val{:new}, args, typ)
-    dt = load_and_emit_datatype!(cg, args[1])
     typ = eval(args[1])
     if isbits(typ)
         @debug "$(cg.name): creating bitstype" args
-        llvmstruct = alloca!(cg.builder, llvmtype(typ))
+        loc = alloca!(cg.builder, llvmtype(typ))
         for i in 2:length(args)
-            p = LLVM.gep!(cg.builder, llvmstruct, [codegen!(cg, i-2)])
+            p = LLVM.struct_gep!(cg.builder, loc, i-2)
             LLVM.store!(cg.builder, codegen!(cg, args[i]), p)
         end
-        return LLVM.call!(cg.builder, cg.extern[:jl_new_bits], LLVM.Value[dt, llvmstruct])
+        return LLVM.load!(cg.builder, loc)
     else
+        dt = load_and_emit_datatype!(cg, args[1])
         @debug "$(cg.name): creating composite" args
         llvmargs = LLVM.Value[dt]
         for a in args[2:end]
@@ -448,8 +484,6 @@ end
 #
 # Types - emit and return a stored type or create a new type and store it
 #
-
-# I'm not sure these are appropriate:
 
 # The following creates the appropriate structures in memory
 function codegen!(cg::CodeCtx, ::Type{Array{T,N}}) where {T,N}
