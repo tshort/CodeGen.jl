@@ -179,8 +179,10 @@ function codegen!(cg::CodeCtx)
     for i in cg.nargs+2:length(ci.slotnames)
         varname = string(ci.slotnames[i], "_s", i)
         vartype = llvmtype(ci.slottypes[i])
-        alloc = LLVM.alloca!(cg.builder, vartype, varname)
-        current_scope(cg)[varname] = alloc
+        if !isa(vartype, LLVM.VoidType)
+            alloc = LLVM.alloca!(cg.builder, vartype, varname)
+            current_scope(cg)[varname] = alloc
+        end
     end
     for (i, node) in enumerate(ci.code)
         @debug "$(cg.name): node $i/$(length(ci.code))" node

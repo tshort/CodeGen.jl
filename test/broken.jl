@@ -34,37 +34,19 @@ verify(cg.mod)
 
 
 
-@noinline f(x::A) = x.yy + x.xx
-function newdt(x)
-    a = A(3, 2x)
-    f(a)
-end
-m = codegen(newdt, Tuple{Float64})
-nothing
-# @jitrun(newdt, 1.1) 
 
-# function test_arrays(x)
-#     y = fill(2pi, 5)
-#     push!(y, 3x)
-#     z = reverse(y)
-#     # zz = z.^2   # works
-#     zz = 2 .+ z   # works
-#     zz = y .+ z   # segfaults
-#     # return maximum(zz)
-#     return zz[6]
-# end
-# function test_arrays(x)
-#     y = fill(2pi, 5)
-#     z = fill(x, 5)
-#     # z = y .+ y  # works
-#     # z = 2y # works
-#     zz = y .+ z  # segfaults
-#     return zz[1]
-# end
-# m = codegen(test_arrays, Tuple{Float64})
+function test_arrays(x)
+    y = fill(2pi, 5)
+    z = fill(x, 5)
+    # z = y .+ y  # works
+    # z = 2y # works
+    zz = y .+ y  # segfaults
+    return zz[1]
+end
+m = codegen(test_arrays, Tuple{Float64})
+# @jitrun(test_arrays, 1.1) 
 # nothing
 # # print(m)
-# @jitrun(test_arrays, 1.1) 
 
 # @jlrun(test_arrays, 1.1) 
 

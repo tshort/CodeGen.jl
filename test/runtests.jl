@@ -222,6 +222,11 @@ m = codegen(newmdt, Tuple{Float64})
 @cgtest newmdt(1.1) 
 
 
+abstract type AbstractA end
+struct A <: AbstractA
+    xx::Int
+    yy::Float64
+end
 @noinline f(x::A) = x.yy + x.xx
 function newdt(x)
     a = A(3, 2x)
