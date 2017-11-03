@@ -235,4 +235,20 @@ end
 @cgtest newdt(1.1) 
 
 
+@noinline tf(x) = x[2]
+function tuple_fun(x)
+    t = (x, 2x, 1.0)
+    return tf(t)
+end
+@cgtest tuple_fun(1) 
+
+
+@noinline tf2(x) = x[1][1] + x[2]
+function tuple_fun2(x)
+    t = ((x,),3)
+    return tf2(t)
+end
+@cgtest tuple_fun(2)
+
+
 nothing

@@ -9,27 +9,27 @@ configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
 
+
 # # Results in several problems below:  codegen of this works now
 # codegen(Base.throw_inexacterror, Tuple{Symbol, Type{Int}, Int})
 
 
+# abstract type AbstractA end
+# struct A <: AbstractA
+#     xx::Int
+#     yy::Float64
+# end
+# testf() = 99
 
-abstract type AbstractA end
-struct A <: AbstractA
-    xx::Int
-    yy::Float64
-end
-testf() = 99
-
-cg = CodeGen.CodeCtx_init(testf, Tuple{})
-addr = LLVM.alloca!(cg.builder, CodeGen.llvmtype(A))
-gaddr = LLVM.struct_gep!(cg.builder, addr, 0)
-LLVM.store!(cg.builder, codegen!(cg, 3), gaddr)
-gaddr2 = LLVM.struct_gep!(cg.builder, addr, 1)
-LLVM.store!(cg.builder, codegen!(cg, 2.2), gaddr2)
-v = LLVM.load!(cg.builder, gaddr)
-LLVM.ret!(cg.builder, v)
-verify(cg.mod)
+# cg = CodeGen.CodeCtx_init(testf, Tuple{})
+# addr = LLVM.alloca!(cg.builder, CodeGen.llvmtype(A))
+# gaddr = LLVM.struct_gep!(cg.builder, addr, 0)
+# LLVM.store!(cg.builder, codegen!(cg, 3), gaddr)
+# gaddr2 = LLVM.struct_gep!(cg.builder, addr, 1)
+# LLVM.store!(cg.builder, codegen!(cg, 2.2), gaddr2)
+# v = LLVM.load!(cg.builder, gaddr)
+# LLVM.ret!(cg.builder, v)
+# verify(cg.mod)
 
 
 
@@ -37,13 +37,14 @@ verify(cg.mod)
 
 function test_arrays(x)
     y = fill(2pi, 5)
-    z = fill(x, 5)
-    # z = y .+ y  # works
+    # z = fill(x, 5)
+    z = 2y .+ y  # works
     # z = 2y # works
-    zz = y .+ y  # segfaults
-    return zz[1]
+    # zz = 2 .+ y  # segfaults
+    return z[1]
 end
 m = codegen(test_arrays, Tuple{Float64})
+verify(m)
 # @jitrun(test_arrays, 1.1) 
 # nothing
 # # print(m)

@@ -13,8 +13,8 @@ mutable struct CodeCtx <: AbstractCodeCtx
     result_type
     argtypes
     nargs::Int
-    current_scope::CurrentScope
     slots::Vector{LLVM.Value}
+    slotlocs::Vector{Any}
     ssas::Dict{Int, LLVM.Value}
     labels::Dict{Int, Any}
     meta::Dict{Symbol, Any}
@@ -30,8 +30,8 @@ mutable struct CodeCtx <: AbstractCodeCtx
             result_type,
             argtypes,
             length(argtypes.parameters),
-            CurrentScope(),
             Vector{LLVM.Value}(length(ci.slotnames)),
+            Vector{Any}(length(ci.slotnames)),
             Dict{Int, LLVM.Value}(),
             Dict{Int, Any}(),
             Dict{Symbol, Any}()
@@ -41,7 +41,7 @@ end
 function CodeCtx(name, ci::CodeInfo, result_type, argtypes; triple = nothing, datalayout = nothing)
     cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), name, ci, result_type, argtypes)
     global CG = cg
-    global M = cg.mod
+    M = cg.mod
     triple != nothing && triple!(cg.mod, triple)
     datalayout != nothing && datalayout!(cg.mod, datalayout)
     cg.builtin = setup_builtins!(cg)
@@ -156,17 +156,19 @@ function codegen!(cg::CodeCtx)
     for (i, param) in enumerate(LLVM.parameters(cg.func))
         argname = string(ci.slotnames[i + 1], "_s", i+1)
         if !isa(LLVM.llvmtype(param), LLVM.VoidType)
-            alloc = LLVM.alloca!(cg.builder, LLVM.llvmtype(param), argname)
-            LLVM.store!(cg.builder, param, alloc)
-            current_scope(cg)[argname] = alloc
+            @show alloc = LLVM.alloca!(cg.builder, LLVM.llvmtype(param), argname)
+            store!(cg, param, alloc)
+            # current_scope(cg)[argname] = alloc
+            cg.slotlocs[i + 1] = alloc
         end
     end
     for i in cg.nargs+2:length(ci.slotnames)
         varname = string(ci.slotnames[i], "_s", i)
         vartype = llvmtype(ci.slottypes[i])
         if !isa(vartype, LLVM.VoidType)
-            alloc = LLVM.alloca!(cg.builder, vartype, varname)
-            current_scope(cg)[varname] = alloc
+            @show alloc = LLVM.alloca!(cg.builder, vartype, varname)
+            # current_scope(cg)[varname] = alloc
+            cg.slotlocs[i] = alloc
         end
     end
     for (i, node) in enumerate(ci.code)
@@ -202,33 +204,34 @@ end
 #  - codegen!(cg, v::SlotNumber) returns what?
 #    - If it's an address, then builtins/structs work. But, does that break ints & floats?
 #    - What if it's a struct with address and value?
-function codegen!(cg::CodeCtx, v::SlotNumber) 
-    varname = string(cg.code_info.slotnames[v.id], "_s", v.id)
+function codegen!(cg::CodeCtx, x::SlotNumber) 
+    varname = string(cg.code_info.slotnames[x.id], "_s", x.id)
     # cg.slots[v.id]
-    V = get(current_scope(cg), varname, nothing)
-    V == nothing && error("did not find variable $(varname)")
-    return LLVM.load!(cg.builder, V, varname*"_")
+    # p = get(current_scope(cg), varname, nothing)
+    p = cg.slotlocs[x.id]
+    p == nothing && error("did not find variable $(varname)")
+    return LLVM.load!(cg.builder, p, varname*"_")
 end
 
-codegen!(cg::CodeCtx, v::SSAValue) = cg.ssas[v.id]
+codegen!(cg::CodeCtx, x::SSAValue) = cg.ssas[x.id]
 
 function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
     result = codegen!(cg, args[2])
     if isa(args[1], SlotNumber)
         varname = string(cg.code_info.slotnames[args[1].id], "_s", args[1].id)
-        V = get(current_scope(cg), varname, nothing)
-        V == nothing && error("unknown variable name $(varname)")
-        if LLVM.llvmtype(result) == int1_t 
-            result = LLVM.zext!(cg.builder, result, int8_t)
-        end
+        @debug "$(cg.name): Assigning slot $(args[1].id)" varname args[2] _typeof(cg, args[1]) _typeof(cg, args[2])
+        # p = get(current_scope(cg), varname, nothing)
+        p = cg.slotlocs[args[1].id]
+        p == nothing && error("unknown variable name $(varname)")
         ## TODO: review this; seems off
-        LLVM.store!(cg.builder, result, V)
-        unboxed_result = emit_unbox!(cg, result, typ)
+        unboxed_result = emit_unbox!(cg, result, _typeof(cg, args[1]))
+        store!(cg, unboxed_result, p)
         cg.slots[args[1].id] = unboxed_result
         return unboxed_result
     end
     if isa(args[1], SSAValue)
-        unboxed_result = emit_unbox!(cg, result, typ)
+        @debug "$(cg.name): Assigning SSA $(args[1].id)" typ
+        unboxed_result = emit_unbox!(cg, result, _typeof(cg, args[1]))
         cg.ssas[args[1].id] = unboxed_result
         return unboxed_result
     end
@@ -246,8 +249,14 @@ function codegen!(cg::CodeCtx, f::GlobalRef)
     end
 end
 
-codegen!(cg::CodeCtx, x::QuoteNode) = emit_symbol!(cg, x.value)
-
+codegen!(cg::CodeCtx, x::QuoteNode) = codegen!(cg, x.value)
+codegen!(cg::CodeCtx, x::Symbol) = emit_symbol!(cg, x)
+function codegen!(cg::CodeCtx, x::T) where {T}
+    if isbits(T) && sizeof(T) == 0 
+        return codegen!(cg, 0)   # I'm not sure how to handle singleton types
+    end
+    error("Unsupported type: $T")
+end
 
 #
 # Function calls
@@ -263,7 +272,7 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     end
     if isa(fun, Core.Builtin)
         @debug "$(cg.name): calling builtin: $name"
-        return emit_unbox!(cg, emit_builtin!(cg, args[1].name, args[2:end]), typ)
+        return emit_unbox!(cg, emit_builtin!(cg, args[1].name, args[2:end], typ), typ)
     end
     @debug "$(cg.name): calling other method: $name" args
     ## NOTE: everything past here may be wrong!
@@ -363,6 +372,8 @@ codegen!(cg::CodeCtx, ::NewvarNode) = nothing
 
 codegen!(cg::CodeCtx, ::Void) = nothing
 
+codegen!(cg::CodeCtx, ::Tuple{}) = cg.datatype[Tuple{}]
+
 codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
 
 codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1])
@@ -389,7 +400,7 @@ function codegen!(cg::CodeCtx, ::Val{:foreigncall}, args, typ)
     
     return LLVM.call!(cg.builder, func, llvmargs)
 end
-nameof(x::QuoteNode) = Symbol(x.value)
+nameof(x::QuoteNode) = nameof(x.value)
 nameof(x::String) = Symbol(x)
 nameof(x) = x
 
@@ -431,10 +442,7 @@ function codegen!(cg::CodeCtx, gn::GotoNode)
 end
 
 function codegen!(cg::CodeCtx, ::Val{:gotoifnot}, args, typ)
-    condv = codegen!(cg, args[1])
-    if LLVM.width(LLVM.llvmtype(condv)) > 1
-        condv = LLVM.trunc!(cg.builder, condv, int1_t)
-    end
+    condv = emit_condition!(cg, codegen!(cg, args[1]))
     func = LLVM.parent(LLVM.position(cg.builder))
     ifso = LLVM.BasicBlock(func, "if", ctx)
     ifnot = LLVM.BasicBlock(func, "L", ctx)
@@ -443,22 +451,26 @@ function codegen!(cg::CodeCtx, ::Val{:gotoifnot}, args, typ)
     position!(cg.builder, ifso)
 end
 
+emit_condition!(cg, condv) = LLVM.width(LLVM.llvmtype(condv)) > 1 ?
+        LLVM.trunc!(cg.builder, condv, int1_t) : condv
+
+
 #
 # New - structure creation
 #
 function codegen!(cg::CodeCtx, ::Val{:new}, args, typ)
     typ = eval(args[1])
     if isbits(typ)
-        @debug "$(cg.name): creating bitstype" args
-        loc = alloca!(cg.builder, llvmtype(typ))
+        @debug "$(cg.name): creating bitstype" args typ
+        @show loc = alloca!(cg.builder, llvmtype(typ))
         for i in 2:length(args)
             p = LLVM.struct_gep!(cg.builder, loc, i-2)
-            LLVM.store!(cg.builder, codegen!(cg, args[i]), p)
+            store!(cg, codegen!(cg, args[i]), p)
         end
         return LLVM.load!(cg.builder, loc)
     else
         dt = load_and_emit_datatype!(cg, args[1])
-        @debug "$(cg.name): creating composite" args
+        @debug "$(cg.name): creating composite" args typ
         llvmargs = LLVM.Value[dt]
         for a in args[2:end]
             push!(llvmargs, emit_box!(cg, a))
@@ -512,7 +524,7 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
     loc = LLVM.GlobalVariable(cg.mod, jl_datatype_t_ptr, string(JT))
     LLVM.linkage!(loc, LLVM.API.LLVMCommonLinkage)
     LLVM.initializer!(loc, null(LLVM.Int64Type(ctx)))
-    LLVM.store!(cg.builder, dt, loc)
+    store!(cg, dt, loc)
     result = LLVM.load!(cg.builder, loc)
     cg.datatype[JT] = result
     return result
