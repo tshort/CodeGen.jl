@@ -2,8 +2,6 @@
 # Bitcode optimization and running utilities.
 # 
 
-export optimize!, @jitrun, @jlrun
-
 """
     optimize!(mod::LLVM.Module)
 

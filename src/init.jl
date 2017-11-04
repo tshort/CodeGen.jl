@@ -3,7 +3,6 @@
 # 
 
 const ctx = LLVM.Context(convert(LLVM.API.LLVMContextRef, cglobal(:jl_LLVMContext, Void)))
-# const ctx = LLVM.GlobalContext()
 
 # Convert a Julia type to an LLVM type
 # Note that LLVM.llvmtype returns the LLVM type of an LLVM value (could combine?)
@@ -19,8 +18,6 @@ llvmtype(x) =
 # 
 const jl_value_t_ptr = llvmtype(Any)
 const jl_value_t = eltype(jl_value_t_ptr)
-# const jl_value_t = LLVM.StructType("jl_value_t", ctx)
-# const jl_value_t_ptr = LLVM.PointerType(jl_value_t)
 const jl_value_t_ptr_ptr = LLVM.PointerType(jl_value_t_ptr)
 # cheat on these for now:
 const jl_datatype_t_ptr = jl_value_t_ptr
@@ -29,23 +26,6 @@ const jl_typename_t_ptr = jl_value_t_ptr
 const jl_sym_t_ptr = jl_value_t_ptr 
 const jl_svec_t_ptr = jl_value_t_ptr 
 const jl_module_t_ptr = jl_value_t_ptr 
-
-const tmap = Dict{Type,LLVM.LLVMType}(
-    Void    => LLVM.VoidType(ctx),
-    Bool    => LLVM.Int8Type(ctx),
-    Int8    => LLVM.Int8Type(ctx),
-    Int16   => LLVM.Int16Type(ctx),
-    Int32   => LLVM.Int32Type(ctx),
-    Int64   => LLVM.Int64Type(ctx),
-    UInt8   => LLVM.Int8Type(ctx),
-    UInt16  => LLVM.Int16Type(ctx),
-    UInt32  => LLVM.Int32Type(ctx),
-    UInt64  => LLVM.Int64Type(ctx),
-    Float32 => LLVM.FloatType(ctx),
-    Float64 => LLVM.DoubleType(ctx)
-)
-# llvmtype(x) = get(tmap, x, jl_value_t_ptr)
-
 
 const bool_t  = llvmtype(Bool)
 const int1_t  = LLVM.Int1Type(ctx)
