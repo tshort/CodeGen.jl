@@ -87,7 +87,11 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :rint_llvm  && return a1("rint")
     name == :sqrt_llvm  && return a1("sqrt")
 
-    # ctlz_int
+    name == :ctlz_int  && return LLVM.call!(cg.builder, 
+        LLVM.Function(cg.mod, "llvm.ctlz.$(ltyp(args[1]))", 
+                      LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1]), int1_t])), 
+        LLVM.Value[args[1], LLVM.ConstantInt(int1_t, 0)])
+ 
     # cttz_int
     # copysign_float
     if name == :flipsign_int 
@@ -95,21 +99,6 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
         tmp = LLVM.ashr!(cg.builder, args[2], codegen!(cg, LLVM.width(LLVM.llvmtype(args[1])) - 1))
         return LLVM.xor!(cg.builder, LLVM.add!(cg.builder, args[1], tmp), tmp)
     end
-    # case flipsign_int: {
-    #     ConstantInt *cx = dyn_cast<ConstantInt>(x);
-    #     ConstantInt *cy = dyn_cast<ConstantInt>(y);
-    #     if (cx && cy) {
-    #         APInt ix = cx->getValue();
-    #         APInt iy = cy->getValue();
-    #         return ConstantInt::get(t, iy.isNonNegative() ? ix : -ix);
-    #     }
-    #     if (cy) {
-    #         APInt iy = cy->getValue();
-    #         return iy.isNonNegative() ? x : ctx.builder.CreateSub(ConstantInt::get(t, 0), x);
-    #     }
-    #     Value *tmp = ctx.builder.CreateAShr(y, ConstantInt::get(t, cast<IntegerType>(t)->getBitWidth() - 1));
-    #     return ctx.builder.CreateXor(ctx.builder.CreateAdd(x, tmp), tmp);
-    # }
 
     name == :sitofp  && return LLVM.sitofp!(cg.builder, args[2], args[1])
     name == :uitofp  && return LLVM.uitofp!(cg.builder, args[2], args[1])
