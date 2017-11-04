@@ -8,10 +8,21 @@ using MicroLogging
 configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
+# fargs(a,b,c) = 2a+b+c
+# m = codegen(fargs, Tuple{Int,Int,Int})
 
-m = codegen(Base.print_to_string, Tuple{Float64})
+function varargs_fun(x...)
+    a = x[1]
+    b = 3
+    return a + b
+end
+ci = code_typed(varargs_fun, Tuple{Int, Float64})
+m = first(methods(varargs_fun, Tuple{Int, Float64}))
+# m = codegen(varargs_fun, Tuple{Int, Float64})   # segfaults
 
 
+# m = codegen(string, Tuple{String, String})
+# m = codegen(Base.print_to_string, Tuple{Float64})
 # m = codegen(sin_fast, Tuple{Float64}) # tries to call libopenlibm
 # m = codegen(rand, Tuple{}) #  ccall issue
 # m = codegen(sqrt, Tuple{Float64}) # compiles; verification fails big-time

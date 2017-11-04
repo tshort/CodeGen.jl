@@ -21,8 +21,9 @@ files with `write(mod, filepath)`. It can be optimized with
 """
 function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
-    funname = string(Base.function_name(fun)) # good link: typeof(f).name.mt.name; https://stackoverflow.com/questions/38819327/given-a-function-object-how-do-i-find-its-name-and-module
-    cg = CodeCtx(funname, ci, dt, argtypes)
+    sig = first(methods(fun, argtypes)).sig
+    funname = string(Base.function_name(fun))
+    cg = CodeCtx(funname, ci, dt, argtypes, sig)
     return codegen!(cg)
 end
 
@@ -52,7 +53,7 @@ function codegen!(cg::CodeCtx)
     entry = LLVM.BasicBlock(cg.func, "entry", ctx)
     LLVM.position!(cg.builder, entry)
     for (i, param) in enumerate(LLVM.parameters(cg.func))
-        argname = string(ci.slotnames[i + 1], "_s", i+1)
+        argname = string(ci.slotnames[i + 1], "_as", i+1)
         if !isa(LLVM.llvmtype(param), LLVM.VoidType)
             alloc = LLVM.alloca!(cg.builder, LLVM.llvmtype(param), argname)
             store!(cg, param, alloc)
@@ -198,16 +199,17 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
         global MI = args[1]
         argtypes = getargtypes(args[1])
         @debug "$(cg.name): argtypes" args argtypes
-        dump(args)
         if isa(args[1], Core.MethodInstance) && isdefined(args[1], :inferred) && args[1].inferred != nothing
             MI = args[1]
             ci = Base.uncompressed_ast(MI.def, MI.inferred)
             dt = MI.rettype
+            sig = MI.def.sig
         else
             fun = eval(getname(args[1]))
             ci, dt = code_typed(fun, argtypes, optimize = true)[1]
+            sig = first(methods(fun, argtypes)).sig
         end
-        newcg = CodeCtx(cg, name, ci, dt, argtypes)
+        newcg = CodeCtx(cg, name, ci, dt, argtypes, sig)
         codegen!(newcg)
         func = newcg.func
     end

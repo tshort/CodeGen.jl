@@ -12,6 +12,7 @@ mutable struct CodeCtx <: AbstractCodeCtx
     code_info::CodeInfo
     result_type
     argtypes
+    sig
     nargs::Int
     slots::Vector{LLVM.Value}
     slotlocs::Vector{Any}
@@ -22,13 +23,14 @@ mutable struct CodeCtx <: AbstractCodeCtx
     extern::Dict{Symbol, Any}
     builtin::Dict{Symbol, LLVM.Function}
     datatype::Dict{Type, Any}
-    CodeCtx(mod::LLVM.Module, name, ci::CodeInfo, result_type, argtypes) = 
+    CodeCtx(mod::LLVM.Module, name, ci::CodeInfo, result_type, argtypes, sig) = 
         new(LLVM.Builder(ctx),
             mod, 
             name,
             ci,
             result_type,
             argtypes,
+            sig,
             length(argtypes.parameters),
             Vector{LLVM.Value}(length(ci.slotnames)),
             Vector{Any}(length(ci.slotnames)),
@@ -38,8 +40,8 @@ mutable struct CodeCtx <: AbstractCodeCtx
             )
 end
 
-function CodeCtx(name, ci::CodeInfo, result_type, argtypes; triple = nothing, datalayout = nothing)
-    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), name, ci, result_type, argtypes)
+function CodeCtx(name, ci::CodeInfo, result_type, argtypes, sig; triple = nothing, datalayout = nothing)
+    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), name, ci, result_type, argtypes, sig)
     global CG = cg
     M = cg.mod
     triple != nothing && triple!(cg.mod, triple)
@@ -51,11 +53,11 @@ function CodeCtx(name, ci::CodeInfo, result_type, argtypes; triple = nothing, da
 end
 
 CodeCtx(; triple = nothing, datalayout = nothing) = 
-    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), "", CodeInfo(), Void, Tuple{}, triple = triple, datalayout = datalayout)
+    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), "", CodeInfo(), Void, Tuple{}, Tuple{}, triple = triple, datalayout = datalayout)
 
 
-function CodeCtx(orig_cg::CodeCtx, name, ci::CodeInfo, result_type, argtypes)
-    cg = CodeCtx(orig_cg.mod, name, ci, result_type, argtypes)
+function CodeCtx(orig_cg::CodeCtx, name, ci::CodeInfo, result_type, argtypes, sig)
+    cg = CodeCtx(orig_cg.mod, name, ci, result_type, argtypes, sig)
     cg.builtin = orig_cg.builtin
     cg.extern = orig_cg.extern
     cg.datatype = orig_cg.datatype
@@ -64,6 +66,7 @@ end
 
 function CodeCtx(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing)
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    sig = first(methods(fun, argtypes)).sig
     funname = string(Base.function_name(fun))
     cg = CodeCtx(funname, ci, dt, argtypes)
     codegen!(cg)
@@ -73,8 +76,9 @@ end
 # This is for testing
 function CodeCtx_init(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing)
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    sig = first(methods(fun, argtypes)).sig
     funname = string(Base.function_name(fun))
-    cg = CodeCtx(funname, ci, dt, argtypes)
+    cg = CodeCtx(funname, ci, dt, argtypes, sig)
     @info "## $(cg.name)"
     ci = cg.code_info
     argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
