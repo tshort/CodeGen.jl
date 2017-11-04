@@ -206,7 +206,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
         func = newcg.func
     end
     llvmargs = LLVM.Value[]
-    # dump(args)
+    dump(args[3:end])
     for v in args[3:end]
         push!(llvmargs, codegen!(cg, v))
     end
@@ -261,7 +261,7 @@ codegen!(cg::CodeCtx, ::LineNumberNode) = nothing
 
 codegen!(cg::CodeCtx, ::NewvarNode) = nothing
 
-codegen!(cg::CodeCtx, ::Void) = nothing
+codegen!(cg::CodeCtx, ::Void) = cg.datatype[Void]
 
 codegen!(cg::CodeCtx, ::Tuple{}) = cg.datatype[Tuple{}]
 

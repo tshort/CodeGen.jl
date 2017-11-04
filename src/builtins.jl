@@ -16,7 +16,7 @@ function emit_builtin!(cg::CodeCtx, name, jlargs, typ)
     end 
     if name == :getfield && isbits(cg, jlargs[1])
         v = codegen!(cg, jlargs[1])
-        @debug "getfield" jlargs _typeof(cg, jlargs[2])
+        @debug "$(cg.name): getfield" jlargs _typeof(cg, jlargs[2])
         if _typeof(cg, jlargs[2]) <: Integer 
             idx = jlargs[2]
         elseif _typeof(cg, jlargs[2]) <: QuoteNode
@@ -55,7 +55,7 @@ emit_val!(cg::CodeCtx, v) = LLVM.llvmtype(v) == int1_t ? LLVM.zext!(cg.builder, 
 # Make a custom `store!` to handle Bool/i1 values and stuff that shouldn't store
 function store!(cg::CodeCtx, v, p)
     newv = emit_val!(cg, v)
-    @debug "store " newv v p
+    @debug "$(cg.name): store " newv v p
     if newv != cg.datatype[Tuple{}]
         return LLVM.store!(cg.builder, newv, p)
     end
