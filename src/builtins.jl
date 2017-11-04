@@ -45,7 +45,7 @@ function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
     # T == SSAValue        && return emit_box!(cg, T, codegen!(cg, x.id))
     # T == SlotNumber      && return emit_box!(cg, T, codegen!(cg, x.id))
     if T == SlotNumber 
-        @show slottype = cg.code_info.slottypes[x.id]
+        slottype = cg.code_info.slottypes[x.id]
         # if isbits(slottype) 
             return emit_box!(cg, slottype, v)
         # else
@@ -62,7 +62,6 @@ function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
         end
     end
     if T == Expr
-        dump(x)
         # if isbits(x.typ) 
             return emit_box!(cg, x.typ, v)
         # else
@@ -94,9 +93,10 @@ end
 
 Base.isbits(cg::CodeCtx, x) = false
 Base.isbits(cg::CodeCtx, x::SlotNumber) = isbits(cg.code_info.slottypes[x.id])
+Base.isbits(cg::CodeCtx, x::SSAValue) = isbits(cg.code_info.ssavaluetypes[x.id + 1])
 Base.isbits(cg::CodeCtx, x::Expr) = isbits(x.typ)
-# Base.fieldnames(cg, x) = fieldnames(typeof(x))
 Base.fieldnames(cg::CodeCtx, x::SlotNumber) = fieldnames(cg.code_info.slottypes[x.id])
+Base.fieldnames(cg::CodeCtx, x::SSAValue) = fieldnames(cg.code_info.ssavaluetypes[x.id + 1])
 Base.fieldnames(cg::CodeCtx, x::Expr) = fieldnames(x.typ)
 _typeof(cg::CodeCtx, x::SlotNumber) = cg.code_info.slottypes[x.id]
 _typeof(cg::CodeCtx, x::SSAValue) = cg.code_info.ssavaluetypes[x.id + 1]
@@ -116,10 +116,17 @@ function emit_builtin!(cg::CodeCtx, name, jlargs, typ)
         # end
     end 
     if name == :getfield && isbits(cg, jlargs[1])
-        @debug "$(cg.name): emitting getfield"
         v = codegen!(cg, jlargs[1])
-        idx = findfirst(equalto(nameof(jlargs[2])), fieldnames(cg, jlargs[1])) - 1
-        return LLVM.extract_value!(cg.builder, v, idx)
+        @debug "getfield" jlargs _typeof(cg, jlargs[2])
+        if _typeof(cg, jlargs[2]) <: Integer 
+            idx = jlargs[2]
+        elseif _typeof(cg, jlargs[2]) <: QuoteNode
+            idx = findfirst(equalto(nameof(jlargs[2])), fieldnames(cg, jlargs[1]))
+            idx > 0 || error("a problem with getfield")
+        else
+            error("problem with getfield")
+        end
+        return LLVM.extract_value!(cg.builder, v, idx - 1)
     end
     if name == :tuple && isbits(typ)
         @debug "$(cg.name): emitting tuple of isbits $typ"
@@ -131,6 +138,7 @@ function emit_builtin!(cg::CodeCtx, name, jlargs, typ)
         return LLVM.load!(cg.builder, loc)
     end
     # Otherwise default to the C++ versions of these.
+    @debug "$(cg.name): builtin"  typ jlargs 
     cgnargs = codegen!(cg, UInt32(nargs))
     newargs = LLVM.array_alloca!(cg.builder, jl_value_t_ptr, cgnargs)
     for i in 1:nargs

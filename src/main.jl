@@ -156,9 +156,8 @@ function codegen!(cg::CodeCtx)
     for (i, param) in enumerate(LLVM.parameters(cg.func))
         argname = string(ci.slotnames[i + 1], "_s", i+1)
         if !isa(LLVM.llvmtype(param), LLVM.VoidType)
-            @show alloc = LLVM.alloca!(cg.builder, LLVM.llvmtype(param), argname)
+            alloc = LLVM.alloca!(cg.builder, LLVM.llvmtype(param), argname)
             store!(cg, param, alloc)
-            # current_scope(cg)[argname] = alloc
             cg.slotlocs[i + 1] = alloc
         end
     end
@@ -166,8 +165,7 @@ function codegen!(cg::CodeCtx)
         varname = string(ci.slotnames[i], "_s", i)
         vartype = llvmtype(ci.slottypes[i])
         if !isa(vartype, LLVM.VoidType)
-            @show alloc = LLVM.alloca!(cg.builder, vartype, varname)
-            # current_scope(cg)[varname] = alloc
+            alloc = LLVM.alloca!(cg.builder, vartype, varname)
             cg.slotlocs[i] = alloc
         end
     end
@@ -199,11 +197,6 @@ end
 # Variable assignment and reading
 #
 
-# This may need a reorg.
-#  - Sometimes, you may want the pointers for Slots and SSAs. 
-#  - codegen!(cg, v::SlotNumber) returns what?
-#    - If it's an address, then builtins/structs work. But, does that break ints & floats?
-#    - What if it's a struct with address and value?
 function codegen!(cg::CodeCtx, x::SlotNumber) 
     varname = string(cg.code_info.slotnames[x.id], "_s", x.id)
     # cg.slots[v.id]
@@ -213,26 +206,27 @@ function codegen!(cg::CodeCtx, x::SlotNumber)
     return LLVM.load!(cg.builder, p, varname*"_")
 end
 
-codegen!(cg::CodeCtx, x::SSAValue) = cg.ssas[x.id]
+codegen!(cg::CodeCtx, x::SSAValue) = LLVM.load!(cg.builder, cg.ssas[x.id])
 
 function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
     result = codegen!(cg, args[2])
     if isa(args[1], SlotNumber)
         varname = string(cg.code_info.slotnames[args[1].id], "_s", args[1].id)
         @debug "$(cg.name): Assigning slot $(args[1].id)" varname args[2] _typeof(cg, args[1]) _typeof(cg, args[2])
-        # p = get(current_scope(cg), varname, nothing)
         p = cg.slotlocs[args[1].id]
-        p == nothing && error("unknown variable name $(varname)")
-        ## TODO: review this; seems off
         unboxed_result = emit_unbox!(cg, result, _typeof(cg, args[1]))
-        store!(cg, unboxed_result, p)
+        if _typeof(cg, args[2]) != Union{}
+            store!(cg, unboxed_result, p)
+        end
         cg.slots[args[1].id] = unboxed_result
         return unboxed_result
     end
     if isa(args[1], SSAValue)
-        @debug "$(cg.name): Assigning SSA $(args[1].id)" typ
+        @debug "$(cg.name): Assigning SSA $(args[1].id)" typ llvmtype(_typeof(cg, args[1]))
         unboxed_result = emit_unbox!(cg, result, _typeof(cg, args[1]))
-        cg.ssas[args[1].id] = unboxed_result
+        p = alloca!(cg.builder, llvmtype(_typeof(cg, args[1])))
+        store!(cg, unboxed_result, p)
+        cg.ssas[args[1].id] = p
         return unboxed_result
     end
 end
@@ -307,7 +301,6 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
             dt = MI.rettype
         else
             fun = eval(getname(args[1]))
-            dump(fun)
             ci, dt = code_typed(fun, argtypes, optimize = true)[1]
         end
         newcg = CodeCtx(cg, name, ci, dt, argtypes)
@@ -378,7 +371,7 @@ codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
 
 codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1])
 
-codegen!(cg::CodeCtx, ::Val{:simdloop}, args, typ) = (dump(args); nothing)
+codegen!(cg::CodeCtx, ::Val{:simdloop}, args, typ) = nothing
 
 #
 # ccall
@@ -461,8 +454,8 @@ emit_condition!(cg, condv) = LLVM.width(LLVM.llvmtype(condv)) > 1 ?
 function codegen!(cg::CodeCtx, ::Val{:new}, args, typ)
     typ = eval(args[1])
     if isbits(typ)
-        @debug "$(cg.name): creating bitstype" args typ
-        @show loc = alloca!(cg.builder, llvmtype(typ))
+        @debug "$(cg.name): creating bitstype" args typ llvmtype(typ)
+        loc = alloca!(cg.builder, llvmtype(typ))
         for i in 2:length(args)
             p = LLVM.struct_gep!(cg.builder, loc, i-2)
             store!(cg, codegen!(cg, args[i]), p)

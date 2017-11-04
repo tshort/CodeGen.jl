@@ -8,6 +8,8 @@ using MicroLogging
 configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
+array_sum(x) = sum(Int[3,x])
+m = codegen(array_sum, Tuple{Int})
 
 
 # # Results in several problems below:  codegen of this works now
