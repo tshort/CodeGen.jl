@@ -46,18 +46,26 @@ configure_logging(min_level=:debug)
 # codegen(make_string, Tuple{Int}) # Unsupported intrinsic: arraylen
 
 
-# codegen(sin, Tuple{Float64}) # Unsupported intrinsic: arraylen
+codegen(sin, Tuple{Float64}) # Unsupported intrinsic: arraylen
+# -  Base.#print_to_string#247 ccall creating: jl_array_to_string                                                Debug main.jl:385
+# ERROR: LoadError: MethodError: Cannot `convert` an object of type Void to an object of type LLVM.Value
+# This may have arisen from a call to the constructor LLVM.Value(...),
+# since type constructors fall back to convert methods.
+# Stacktrace:
+#  [1] push!(::Array{LLVM.Value,1}, ::Void) at ./array.jl:913
+#  [2] codegen!(::CodeGen.CodeCtx, ::Val{:invoke}, ::Array{Any,1}, ::Type) at /home/tshort/.julia/v0.7/CodeGen/src/main.jl:313
 
 
-function type_unstable(x)
-    for i = 1:10
-      x = x/2
-    end
-    return x
-end
-m = codegen(type_unstable, Tuple{Int})
-verify(m)
-nothing
+
+# function type_unstable(x)
+#     for i = 1:10
+#       x = x/2
+#     end
+#     return x
+# end
+# m = codegen(type_unstable, Tuple{Int})
+# verify(m)
+# nothing
 # @jitrun(type_unstable, 1)   # segfaults
 
 

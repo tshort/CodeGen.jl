@@ -102,7 +102,7 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :zext_int   && return LLVM.zext!(cg.builder, args[2], args[1])
     name == :fpzext     && return LLVM.fpext!(cg.builder, args[2], args[1])
     name == :bitcast    && return LLVM.bitcast!(cg.builder, args[2], args[1])
-    # arraylen:
+    name == :arraylen  && return LLVM.call!(cg.builder, LLVM.Function(cg.mod, "jl_array_len_", LLVM.FunctionType(llvmtype(Cint), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
     # pointerref:
     # pointerset:
 
