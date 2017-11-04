@@ -253,9 +253,10 @@ end
 
 function test_arrays(x)
     y = fill(2pi, 5)
-    z = fill(x, 5)
-    w = 2y .+ z
-    return w[1]
+    push!(y, 3x)
+    z = reverse(y)
+    zz = y .+ z.^2
+    return maximum(zz)
 end
 @cgtest test_arrays(2.2)
 

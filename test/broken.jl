@@ -40,31 +40,25 @@ configure_logging(min_level=:debug)
 # codegen(array_max2, Tuple{Float64}) # no method matching emit_box!(::CodeGen.CodeCtx, ::Type{Tuple{Int64,Float64}}, ::LLVM.LoadInst)  
 
 
-# function test_arrays(x)
-#     y = fill(2pi, 5)
-#     push!(y, 3x)
-#     z = reverse(y)
-#     zz = y .+ z.^2
-#     return maximum(zz)
-# end
-# codegen(test_arrays, Tuple{Float64})  
    
 
 # make_string(x) = string(1, x, "asdf")
-# codegen(make_string, Tuple{Int}) # same error as above
+# codegen(make_string, Tuple{Int}) # Unsupported intrinsic: arraylen
 
 
-# codegen(sin, Tuple{Float64})
+# codegen(sin, Tuple{Float64}) # Unsupported intrinsic: arraylen
 
 
-# function type_unstable(x)
-#     for i = 1:10
-#       x = x/2
-#     end
-#     return x
-# end
-# codegen(type_unstable, Tuple{Int})
-# # @jitrun(type_unstable, 1)   # segfaults
+function type_unstable(x)
+    for i = 1:10
+      x = x/2
+    end
+    return x
+end
+m = codegen(type_unstable, Tuple{Int})
+verify(m)
+nothing
+# @jitrun(type_unstable, 1)   # segfaults
 
 
 
