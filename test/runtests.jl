@@ -251,4 +251,13 @@ end
 @cgtest tuple_fun(2)
 
 
+function test_arrays(x)
+    y = fill(2pi, 5)
+    z = fill(x, 5)
+    w = 2y .+ z
+    return w[1]
+end
+@cgtest test_arrays(2.2)
+
+
 nothing

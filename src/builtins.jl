@@ -153,8 +153,14 @@ end
 
 emit_val!(cg::CodeCtx, v) = LLVM.llvmtype(v) == int1_t ? LLVM.zext!(cg.builder, v, int8_t) : v
 
-# Make a custom `store!` to handle Bool/i1 values
-store!(cg::CodeCtx, v, p) = LLVM.store!(cg.builder, emit_val!(cg, v), p)
+# Make a custom `store!` to handle Bool/i1 values and stuff that shouldn't store
+function store!(cg::CodeCtx, v, p)
+    newv = emit_val!(cg, v)
+    @debug "store " newv v p
+    if newv != cg.datatype[Tuple{}]
+        return LLVM.store!(cg.builder, newv, p)
+    end
+end
 
 
 function setup_builtins!(cg::CodeCtx)

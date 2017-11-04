@@ -8,10 +8,6 @@ using MicroLogging
 configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
-array_sum(x) = sum(Int[3,x])
-m = codegen(array_sum, Tuple{Int})
-
-
 # # Results in several problems below:  codegen of this works now
 # codegen(Base.throw_inexacterror, Tuple{Symbol, Type{Int}, Int})
 
@@ -35,23 +31,6 @@ m = codegen(array_sum, Tuple{Int})
 
 
 
-
-
-function test_arrays(x)
-    y = fill(2pi, 5)
-    # z = fill(x, 5)
-    z = 2y .+ y  # works
-    # z = 2y # works
-    # zz = 2 .+ y  # segfaults
-    return z[1]
-end
-m = codegen(test_arrays, Tuple{Float64})
-verify(m)
-# @jitrun(test_arrays, 1.1) 
-# nothing
-# # print(m)
-
-# @jlrun(test_arrays, 1.1) 
 
 
 
