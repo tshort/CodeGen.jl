@@ -37,7 +37,8 @@ configure_logging(min_level=:debug)
 # array_max2(x) = maximum([3,x])
 # codegen(array_max2, Tuple{Int})     # This passes & verifies
 # # @cgtest array_max2(1)               # Segfaults...
-# codegen(array_max2, Tuple{Float64}) # no method matching emit_box!(::CodeGen.CodeCtx, ::Type{Tuple{Int64,Float64}}, ::LLVM.LoadInst)  
+# codegen(array_max2, Tuple{Float64})     # getfield problemh
+# @jitrun(array_max2, 1.1)          
 
 
    
@@ -46,7 +47,7 @@ configure_logging(min_level=:debug)
 # codegen(make_string, Tuple{Int}) # Unsupported intrinsic: arraylen
 
 
-codegen(sin, Tuple{Float64}) # Unsupported intrinsic: flipsign_int
+# codegen(sin, Tuple{Float64}) # Unsupported intrinsic: ctlz_int
 
 
 

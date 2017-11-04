@@ -18,6 +18,8 @@ function emit_builtin!(cg::CodeCtx, name, jlargs, typ)
         v = codegen!(cg, jlargs[1])
         @debug "$(cg.name): getfield" jlargs _typeof(cg, jlargs[2])
         if _typeof(cg, jlargs[2]) <: Integer 
+            # FIX: need to codegen this
+            # Actually- need to rework all structs to alloca/store/gep/load
             idx = jlargs[2]
         elseif _typeof(cg, jlargs[2]) <: QuoteNode
             idx = findfirst(equalto(nameof(jlargs[2])), fieldnames(cg, jlargs[1]))

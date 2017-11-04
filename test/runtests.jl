@@ -90,14 +90,13 @@ optimize!(mod)
 @cgtest fx(10.0)
 
 
-abs_fun(x) = abs(x)
-
-z = codegen(abs_fun, Tuple{Float64})
+z = codegen(abs, Tuple{Float64})
 optimize!(z)
 verify(z)
-@cgtest abs_fun(-10.0)
-@cgtest abs_fun(10.0)
-# @cgtest abs_fun(-10)
+@cgtest abs(-10.0)
+@cgtest abs(10.0)
+@cgtest abs(-10)
+@cgtest abs(10)
 
 
 sum_tuple(x) = sum((x, x, 1.0))

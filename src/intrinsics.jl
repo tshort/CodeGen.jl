@@ -90,7 +90,27 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     # ctlz_int
     # cttz_int
     # copysign_float
-    # flipsign_int 
+    if name == :flipsign_int 
+        # ignores the constant case
+        tmp = LLVM.ashr!(cg.builder, args[2], codegen!(cg, LLVM.width(LLVM.llvmtype(args[1])) - 1))
+        return LLVM.xor!(cg.builder, LLVM.add!(cg.builder, args[1], tmp), tmp)
+    end
+    # case flipsign_int: {
+    #     ConstantInt *cx = dyn_cast<ConstantInt>(x);
+    #     ConstantInt *cy = dyn_cast<ConstantInt>(y);
+    #     if (cx && cy) {
+    #         APInt ix = cx->getValue();
+    #         APInt iy = cy->getValue();
+    #         return ConstantInt::get(t, iy.isNonNegative() ? ix : -ix);
+    #     }
+    #     if (cy) {
+    #         APInt iy = cy->getValue();
+    #         return iy.isNonNegative() ? x : ctx.builder.CreateSub(ConstantInt::get(t, 0), x);
+    #     }
+    #     Value *tmp = ctx.builder.CreateAShr(y, ConstantInt::get(t, cast<IntegerType>(t)->getBitWidth() - 1));
+    #     return ctx.builder.CreateXor(ctx.builder.CreateAdd(x, tmp), tmp);
+    # }
+
     name == :sitofp  && return LLVM.sitofp!(cg.builder, args[2], args[1])
     name == :uitofp  && return LLVM.uitofp!(cg.builder, args[2], args[1])
     name == :fptosi  && return LLVM.fptosi!(cg.builder, args[2], args[1])
