@@ -34,8 +34,21 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :rem_float_fast  && return LLVM.frem!(cg.builder, args[1], args[2])
     ## More tough ones
     # name == :fma_float  && return LLVM.frem!(cg.builder, args[1], args[2], "sremtmp")
-    a123(name) = LLVM.call!(cg.builder, LLVM.Function(cg.mod, name, LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1],args[2],args[3]])
-    name == :muladd_float  && return a123("llvm.fmuladd")
+
+    function ltyp(x)
+        res = string(LLVM.llvmtype(x))
+        if res == "double"
+            res = "f64"
+        elseif res == "float"
+            res = "f32"
+        end
+        return res
+    end
+    
+    name == :muladd_float  && return LLVM.call!(cg.builder, 
+        cg.extern[Symbol("llvm.fmuladd.$(ltyp(args[1]))")], 
+        LLVM.Value[args[1], args[2], args[3]])
+
     ## WRONG. Next, need all of the "checked" intrinsics.
     name == :checked_sadd_int  && return LLVM.add!(cg.builder, args[1], args[2])
     name == :checked_uadd_int  && return LLVM.add!(cg.builder, args[1], args[2])
@@ -65,19 +78,8 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :or_int   && return LLVM.or!(cg.builder, args[1], args[2])
     name == :xor_int  && return LLVM.xor!(cg.builder, args[1], args[2])
 
-    function ltyp(x)
-        res = string(LLVM.llvmtype(x))
-        if res == "double"
-            res = "f64"
-        elseif res == "float"
-            res = "f32"
-        end
-        return res
-    end
-    a1(name) = LLVM.call!(cg.builder, 
-        LLVM.Function(cg.mod, "llvm.$name.$(ltyp(args[1]))", 
-                      LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
-    # 
+    a1(name) = LLVM.call!(cg.builder, cg.extern[Symbol("llvm.$name.$(ltyp(args[1]))")], LLVM.Value[args[1]])
+
     name == :bswap_int  && return a1("bswap")
     name == :ctpop_int  && return a1("ctpop")
     name == :abs_float  && return a1("fabs")
@@ -88,8 +90,7 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :sqrt_llvm  && return a1("sqrt")
 
     name == :ctlz_int  && return LLVM.call!(cg.builder, 
-        LLVM.Function(cg.mod, "llvm.ctlz.$(ltyp(args[1]))", 
-                      LLVM.FunctionType(LLVM.llvmtype(args[1]), [LLVM.llvmtype(args[1]), int1_t])), 
+        cg.extern[Symbol("llvm.ctlz.$(ltyp(args[1]))")], 
         LLVM.Value[args[1], LLVM.ConstantInt(int1_t, 0)])
  
     # cttz_int
@@ -111,7 +112,7 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :zext_int   && return LLVM.zext!(cg.builder, args[2], args[1])
     name == :fpzext     && return LLVM.fpext!(cg.builder, args[2], args[1])
     name == :bitcast    && return LLVM.bitcast!(cg.builder, args[2], args[1])
-    name == :arraylen  && return LLVM.call!(cg.builder, LLVM.Function(cg.mod, "jl_array_len_", LLVM.FunctionType(llvmtype(Cint), [LLVM.llvmtype(args[1])])), LLVM.Value[args[1]])
+    name == :arraylen  && return LLVM.call!(cg.builder, cg.extern[:jl_array_len_], LLVM.Value[args[1]])
     # pointerref:
     # pointerset:
 

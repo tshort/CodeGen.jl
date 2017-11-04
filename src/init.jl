@@ -26,6 +26,7 @@ const jl_typename_t_ptr = jl_value_t_ptr
 const jl_sym_t_ptr = jl_value_t_ptr 
 const jl_svec_t_ptr = jl_value_t_ptr 
 const jl_module_t_ptr = jl_value_t_ptr 
+const jl_array_t_ptr = jl_value_t_ptr 
 
 const bool_t  = llvmtype(Bool)
 const int1_t  = LLVM.Int1Type(ctx)
@@ -96,6 +97,27 @@ function setup_externs!(mod)
     e[:jl_svec] = extern!(mod, "jl_svec", jl_svec_t_ptr, LLVMType[], vararg = true)
     e[:jl_new_datatype] = extern!(mod, "jl_new_datatype", jl_datatype_t_ptr, 
         LLVMType[jl_sym_t_ptr, jl_module_t_ptr, jl_datatype_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, int32_t, int32_t, int32_t])
+    # For intrinsics
+    e[:jl_array_len_] = extern!(mod, "jl_array_len_", jl_datatype_t_ptr, LLVMType[jl_array_t_ptr])
+    for i in [Int8,Int16,Int32,Int64,Int128]
+        li = llvmtype(i)
+        for funsym in [:bswap,:ctpop]
+            name = Symbol("llvm.", funsym, ".", li)
+            e[name] = extern!(mod, string(name), li, LLVMType[li])
+        end 
+        name = Symbol("llvm.ctlz.", li)
+        e[name] = extern!(mod, string(name), li, LLVMType[li, int1_t])
+    end 
+    for fp in [Float32,Float64]
+        lfp = llvmtype(fp)
+        fps = fp == Float64 ? "f64" : "f32"
+        for funsym in [:fabs,:ceil,:floor,:trunc,:rint,:sqrt]
+            name = Symbol("llvm.", funsym, ".", fps)
+            e[name] = extern!(mod, string(name), lfp, LLVMType[lfp])
+        end 
+        name = Symbol("llvm.fmuladd.", fps)
+        e[name] = extern!(mod, string(name), lfp, LLVMType[lfp, lfp, lfp])
+    end 
 
     return e
 end
