@@ -46,7 +46,7 @@ configure_logging(min_level=:debug)
 # codegen(make_string, Tuple{Int}) # Unsupported intrinsic: arraylen
 
 
-codegen(sin, Tuple{Float64}) 
+codegen(sin, Tuple{Float64}) # Unsupported intrinsic: flipsign_int
 
 
 

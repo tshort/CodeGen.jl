@@ -206,7 +206,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
         func = newcg.func
     end
     llvmargs = LLVM.Value[]
-    dump(args[3:end])
+    # dump(args[3:end])
     for v in args[3:end]
         push!(llvmargs, codegen!(cg, v))
     end
@@ -234,7 +234,7 @@ function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
 end
 
 #
-# Constants
+# Constants / values
 #
 
 codegen!(cg::CodeCtx, x::T) where T <: Base.IEEEFloat =
@@ -253,6 +253,16 @@ function codegen!(cg::CodeCtx, s::String)
     return LLVM.call!(cg.builder, cg.extern[:jl_pchar_to_string], LLVM.Value[gs, codegen!(cg, Int32(length(s)+1))])
 end
 
+function codegen!(cg::CodeCtx, x::Tuple)
+    if isbits(x)
+        loc = alloca!(cg.builder, llvmtype(typeof(x)))
+        for i in 1:length(x)
+            p = LLVM.struct_gep!(cg.builder, loc, i-1)
+            store!(cg, codegen!(cg, x[i]), p)
+        end
+        return LLVM.load!(cg.builder, loc)
+    end
+end
 
 #
 # Miscellaneous
