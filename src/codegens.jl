@@ -113,13 +113,18 @@ function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
         @debug "$(cg.name): Assigning slot $(args[1].id)" varname args[2] _typeof(cg, args[1]) _typeof(cg, args[2])
         p = cg.slotlocs[args[1].id]
         unboxed_result = emit_unbox!(cg, result, _typeof(cg, args[1]))
-        if _typeof(cg, args[2]) != Union{}
-            store!(cg, unboxed_result, p)
+        if _typeof(cg, args[2]) == Union{}
+            return
         end
+        store!(cg, unboxed_result, p)
         cg.slots[args[1].id] = unboxed_result
         return unboxed_result
     end
     if isa(args[1], SSAValue)
+        t = _typeof(cg, args[2])
+        # if !isconcrete(t) # || sizeof(t) == 0
+        #     return
+        # end
         @debug "$(cg.name): Assigning SSA $(args[1].id)" typ llvmtype(_typeof(cg, args[1]))
         unboxed_result = emit_unbox!(cg, result, _typeof(cg, args[1]))
         p = alloca!(cg.builder, llvmtype(_typeof(cg, args[1])))
@@ -193,7 +198,8 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
         global MI = args[1]
         argtypes = getargtypes(args[1])
         @debug "$(cg.name): argtypes" args argtypes
-        if isa(args[1], Core.MethodInstance) && args[1].inferred != nothing
+        dump(args)
+        if isa(args[1], Core.MethodInstance) && isdefined(args[1], :inferred) && args[1].inferred != nothing
             MI = args[1]
             ci = Base.uncompressed_ast(MI.def, MI.inferred)
             dt = MI.rettype
@@ -280,6 +286,8 @@ codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
 codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1])
 
 codegen!(cg::CodeCtx, ::Val{:simdloop}, args, typ) = nothing
+codegen!(cg::CodeCtx, ::Val{:gc_preserve_begin}, args, typ) = nothing
+
 
 #
 # ccall

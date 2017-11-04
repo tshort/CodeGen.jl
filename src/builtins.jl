@@ -18,16 +18,13 @@ function emit_builtin!(cg::CodeCtx, name, jlargs, typ)
         v = codegen!(cg, jlargs[1])
         @debug "$(cg.name): getfield" jlargs _typeof(cg, jlargs[2])
         if _typeof(cg, jlargs[2]) <: Integer 
-            # FIX: need to codegen this
-            # Actually- need to rework all structs to alloca/store/gep/load
             idx = jlargs[2]
+            return LLVM.extract_value!(cg.builder, v, idx - 1)
         elseif _typeof(cg, jlargs[2]) <: QuoteNode
             idx = findfirst(equalto(nameof(jlargs[2])), fieldnames(cg, jlargs[1]))
             idx > 0 || error("a problem with getfield")
-        else
-            error("problem with getfield")
+            return LLVM.extract_value!(cg.builder, v, idx - 1)
         end
-        return LLVM.extract_value!(cg.builder, v, idx - 1)
     end
     if name == :tuple && isbits(typ)
         @debug "$(cg.name): emitting tuple of isbits $typ"

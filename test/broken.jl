@@ -8,6 +8,16 @@ using MicroLogging
 configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
+
+m = codegen(Base.print_to_string, Tuple{Float64})
+
+
+# m = codegen(sin_fast, Tuple{Float64}) # tries to call libopenlibm
+# m = codegen(rand, Tuple{}) #  ccall issue
+# m = codegen(sqrt, Tuple{Float64}) # compiles; verification fails big-time
+# m = codegen(sin, Tuple{Float64}) # compiles; verification fails big-time
+
+
 # # Results in several problems below:  codegen of this works now
 # codegen(Base.throw_inexacterror, Tuple{Symbol, Type{Int}, Int})
 
@@ -44,10 +54,7 @@ configure_logging(min_level=:debug)
    
 
 # make_string(x) = string(1, x, "asdf")
-# codegen(make_string, Tuple{Int}) # Unsupported intrinsic: arraylen
-
-
-m = codegen(sin, Tuple{Float64}) # Unsupported intrinsic: ctlz_int
+# m = codegen(make_string, Tuple{Int}) # Unsupported intrinsic: arraylen
 
 
 
