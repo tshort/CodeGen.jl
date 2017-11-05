@@ -29,9 +29,9 @@ function optimize!(mod::LLVM.Module)
 end
 
 macro jitrun(fun, args...)
-    innerfun = gensym(fun)
+    innerfun = gensym(string(fun))
     quote
-        $innerfun() = $(esc(fun))($(esc(args...)))
+        $innerfun() = $(esc(fun))($(esc.(args)...))
         _jitrun($innerfun)
     end
 end

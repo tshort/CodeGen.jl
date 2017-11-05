@@ -40,7 +40,19 @@ This is the main function for dispatching various types of code generation.
 function codegen!(cg::CodeCtx)
     @info "## $(cg.name)"
     ci = cg.code_info
-    argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
+    getlastsig(x) = last(x.parameters)
+    getlastsig(x::UnionAll) = getlastsig(x.body)
+    sigend = getlastsig(cg.sig)
+    # @show hasvararg = isa(sigend, UnionAll) && sigend.body <: Vararg
+    hasvararg = isa(sigend, UnionAll) && sigend.body.name.name == :Vararg
+    if hasvararg
+        @show cg.sig
+        siglength = length(cg.sig.parameters) - 1
+        argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters[1:siglength-1]]
+        push!(argtypes, llvmtype(Tuple{cg.argtypes.parameters[siglength:end]...}))
+    else
+        argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
+    end
     for i in 1:length(argtypes)
         if isa(argtypes[i], LLVM.VoidType)
             argtypes[i] = int32_t
@@ -191,6 +203,7 @@ gettypes(cg::CodeCtx, x) = typeof(x)
 
 function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     # name = string(Base.function_name(args[1]))
+    dump(args, maxdepth=3)
     name = string(getname(args[1]))
     @info "$(cg.name): invoking $name"
     if haskey(LLVM.functions(cg.mod), name)
@@ -198,14 +211,15 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     else
         global MI = args[1]
         argtypes = getargtypes(args[1])
-        @debug "$(cg.name): argtypes" args argtypes
+        @debug "$(cg.name): invoke argtypes" args argtypes
         if isa(args[1], Core.MethodInstance) && isdefined(args[1], :inferred) && args[1].inferred != nothing
             MI = args[1]
             ci = Base.uncompressed_ast(MI.def, MI.inferred)
             dt = MI.rettype
             sig = MI.def.sig
         else
-            fun = eval(getname(args[1]))
+            fun = getfun(args[1])
+            # fun = eval(Symbol(getname(args[1])))
             ci, dt = code_typed(fun, argtypes, optimize = true)[1]
             sig = first(methods(fun, argtypes)).sig
         end
@@ -214,18 +228,39 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
         func = newcg.func
     end
     llvmargs = LLVM.Value[]
-    # dump(args[3:end])
     for v in args[3:end]
         push!(llvmargs, codegen!(cg, v))
     end
     return LLVM.call!(cg.builder, func, llvmargs)
 end
+getfun(x::Core.MethodInstance) = getfun(x.def)
+getfun(x::Method) = getfield(x.module, x.name)
 
-getname(x::Core.MethodInstance) = getfield(x.def.module, x.def.name)
-getname(x::Method) = getfield(x.module, x.name)
+# getname(x::Core.MethodInstance) = getfield(x.def.module, x.def.name)
+function getname(x::Core.MethodInstance)
+    @show nm = x.def.name
+    @show nm = string(getfield(x.def.module, x.def.name))
+    dump(nm)
+    if nm != "Type"
+        return nm
+    end
+    println("HERE****")
+    return getname(first(x.def.sig.parameters))   
+end
+
+function getname(x::Method)
+    @show nm = string(getfield(x.module, x.name))
+    if nm != "Type"
+        return nm
+    end
+    println("****HERE")
+    @show first(x.sig.parameters)   
+    @show getname(first(x.sig.parameters))   
+    return getname(first(x.sig.parameters))   
+end
 # getname(x::Method) = getfield(x.module, getname(x.sig.parameters[1]))
-# getname(::Type{T}) where T = T.parameters[1].name.name
-# getname(::T) where T = T.name.name
+getname(::Type{T}) where T = string(T.parameters[1].name.name)
+getname(::T) where T = string(T.name.name)
 getargtypes(x::Core.MethodInstance) = Tuple{x.specTypes.parameters[2:end]...}
 getargtypes(x::Method) = Tuple{x.sig.parameters[2:end]...}
 
@@ -305,7 +340,7 @@ function codegen!(cg::CodeCtx, ::Val{:foreigncall}, args, typ)
         cg.extern[name] = func
     end
     llvmargs = LLVM.Value[]
-    for v in args[6:end]
+    for v in args[6:5+args[5]]
         push!(llvmargs, codegen!(cg, v))
     end
     

@@ -19,27 +19,13 @@ configure_logging(min_level=:info)
 Test if `fun(args...)` is equal to `CodeGen.run(fun, args...)`
 """
 macro cgtest(e)
-    _cgtest(e)
-end
-function _cgtest(e)
     f = e.args[1]
     args = length(e.args) > 1 ? e.args[2:end] : Any[]
-    funname = esc(gensym(string(f)))
     quote
-        $funname() = $(esc(f))($(esc(args...)))
-        @test $(esc(e)) == CodeGen._jitrun($(funname))
+        @test $(esc(e)) == @jitrun($(esc(f)), $(esc.(args)...))
     end
 end
 
-
-## Something like the following should work (but broken):
-# macro cgtest(e)
-#     f = e.args[1]
-#     args = length(e.args) > 1 ? e.args[2:end] : Any[]
-#     quote
-#         $(esc(e)) == @jitrun($(esc(f)), $(esc(args...)))
-#     end
-# end
 
 
 array_index(x) = Int[3,2x][2]
@@ -53,15 +39,13 @@ array_max(x) = maximum(Int[4,3x])
 @cgtest array_max(-1)
 
 
-function variables(i) 
-    i = 2i
-    return i
+function variables(i, j, k) 
+    i = 2i + k
+    l = j + i
+    return l
 end
-# @cgtest variables(UInt32(3))  # ERROR: MethodError: no method matching codegen!(::CodeGen.CodeCtx, ::TypedSlot)
-# @cgtest variables(UInt64(3))
-@cgtest variables(3)
-@cgtest variables(3.3)
-@cgtest variables(Float32(3.3))
+@cgtest variables(3,4,5)
+@test variables(3,4,5) == @jitrun(variables,3,4,5)
 
 
 function variables2(i) 
@@ -115,6 +99,8 @@ array_max(x) = maximum(Int[3,x])
 
 
 array_sum(x) = sum(Int[3,x])
+m = codegen(array_sum, Tuple{Int})
+# verify(m)
 @cgtest array_sum(1)
 
 
