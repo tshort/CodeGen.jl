@@ -30,8 +30,7 @@ end
 
 array_index(x) = Int[3,2x][2]
 @cgtest array_index(2)
-println("***")
-println(@jlrun(array_index, 2))
+
 
 array_max(x) = maximum(Int[4,3x])
 @test @jitrun(array_max, -1) == array_max(-1)

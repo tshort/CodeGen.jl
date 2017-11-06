@@ -1,6 +1,6 @@
 
 #
-# Code generation for builtin functions and for boxing and unboxing.
+# Code generation for builtin functions
 # 
 
 function emit_builtin!(cg::CodeCtx, name, jlargs, typ)

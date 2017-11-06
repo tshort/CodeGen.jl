@@ -40,13 +40,15 @@ This is the main function for dispatching various types of code generation.
 function codegen!(cg::CodeCtx)
     @info "## $(cg.name)"
     ci = cg.code_info
-    getlastsig(x) = last(x.parameters)
-    getlastsig(x::UnionAll) = getlastsig(x.body)
-    sigend = getlastsig(cg.sig)
+    lastsig(x) = last(x.parameters)
+    lastsig(x::UnionAll) = lastsig(x.body)
+    siglen(x) = length(x.parameters)
+    siglen(x::UnionAll) = siglen(x.body)
+    sigend = lastsig(cg.sig)
     # @show hasvararg = isa(sigend, UnionAll) && sigend.body <: Vararg
     hasvararg = isa(sigend, UnionAll) && sigend.body.name.name == :Vararg
     if hasvararg
-        siglength = length(cg.sig.parameters) - 1
+        siglength = siglen(cg.sig) - 1
         argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters[1:siglength-1]]
         push!(argtypes, llvmtype(Tuple{cg.argtypes.parameters[siglength:end]...}))
     else
@@ -154,7 +156,8 @@ function codegen!(cg::CodeCtx, f::GlobalRef)
     if isa(evf, Type)
         return codegen!(cg, evf)
     else
-        return emit_box!(cg, Int32(999)) # KLUDGE
+        # Also need to store global variables
+        return emit_box!(cg, Int32(999)) # KLUDGE - WRONG
     end
 end
 
@@ -301,6 +304,17 @@ function codegen!(cg::CodeCtx, x::Tuple)
         end
         return LLVM.load!(cg.builder, loc)
     end
+end
+
+function codegen!(cg::CodeCtx, x::Array{T,N}) where {T,N}
+    # typ = llvmtype(T)
+    # array_type = LLVM.call!(cg.builder, cg.extern[:jl_apply_array_type], LLVM.Value[typ, codegen!(cg, UInt32(N))])
+    # tuple_type = LLVM.call!(cg.builder, cg.extern[:jl_apply_tuple_type], LLVM.Value[])
+    # dims_tuple = jl_new_struct(tuple_type, jl_box...(arg1), jl_box...(arg2), ...);
+    # array = LLVM.call!(cg.builder, cg.extern[:jl_new_array], LLVM.Value[array_type, codegen!(cg, UInt32(N))])
+    # array = jl_new_array_1d(array_type, length(x))
+    # typ = LLVM.load!(cg.builder, cg.datatype[T])
+    # return 
 end
 
 #

@@ -8,8 +8,13 @@ using MicroLogging
 configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
-# fargs(a,b,c) = 2a+b+c
-# m = codegen(fargs, Tuple{Int,Int,Int})
+
+m = codegen(Base.Math.rem_pio2_kernel, Tuple{Float64})
+# @jitrun(Base.Math.rem_pio2_kernel, 1.1)
+nothing
+
+
+
 
 # function varargs_fun(y::Int...)
 #     a = y[1]
@@ -28,7 +33,7 @@ configure_logging(min_level=:debug)
 # m = codegen(Base.print_to_string, Tuple{Float64})
 # m = codegen(sin_fast, Tuple{Float64}) # tries to call libopenlibm
 # m = codegen(rand, Tuple{}) #  ccall issue
-m = codegen(sin, Tuple{Float64}) # compiles; verification fails big-time
+# m = codegen(sin, Tuple{Float64}) # compiles; verification fails big-time
 
 
 # # Results in several problems below:  codegen of this works now
@@ -58,9 +63,9 @@ m = codegen(sin, Tuple{Float64}) # compiles; verification fails big-time
 
 
 # array_max2(x) = maximum([3,x])
-# codegen(array_max2, Tuple{Int})     # This passes & verifies
+# m = codegen(array_max2, Tuple{Int})   # This runs; several verification problems
 # # @cgtest array_max2(1)               # Segfaults...
-# codegen(array_max2, Tuple{Float64})     # getfield problemh
+# codegen(array_max2, Tuple{Float64})
 # @jitrun(array_max2, 1.1)          
 
 
