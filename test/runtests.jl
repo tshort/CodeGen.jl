@@ -253,4 +253,6 @@ end
 @cgtest array_len(2)
 
 
+@cgtest sqrt(2.0)
+
 nothing
