@@ -8,46 +8,6 @@ using MicroLogging
 configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
-"""
-    @cgtest fun(args...)
-
-Test if `fun(args...)` is equal to `CodeGen.run(fun, args...)`
-"""
-# macro cgtest(e)
-#     _cgtest(e)
-# end
-# function _cgtest(e)
-#     f = e.args[1]
-#     args = length(e.args) > 1 ? e.args[2:end] : Any[]
-#     funname = gensym(string(f))
-#     quote
-#         $funname() = $(esc(f))($(esc.(args)...))
-#         @test $(esc(e)) == CodeGen._jitrun($funname)
-#     end
-# end
-
-macro jitrun2(fun, args...)
-    quote
-        innerfun() = $(esc(fun))($(esc.(args)...))
-        CodeGen._jitrun(innerfun)
-    end
-end
-macro cgtest(e)
-    f = e.args[1]
-    args = length(e.args) > 1 ? e.args[2:end] : Any[]
-    quote
-        $(esc(e)) == @jitrun2($(esc(f)), $(esc.(args)...))
-    end
-end
-
-
-array_sum(x) = sum(Int[3,x])
-# m = codegen(array_sum, Tuple{Int})
-# verify(m)
-# @jitrun2(array_sum, 3)
-@cgtest array_sum(1)
-# nothing
-
 # fargs(a,b,c) = 2a+b+c
 # m = codegen(fargs, Tuple{Int,Int,Int})
 

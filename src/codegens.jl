@@ -46,7 +46,6 @@ function codegen!(cg::CodeCtx)
     # @show hasvararg = isa(sigend, UnionAll) && sigend.body <: Vararg
     hasvararg = isa(sigend, UnionAll) && sigend.body.name.name == :Vararg
     if hasvararg
-        @show cg.sig
         siglength = length(cg.sig.parameters) - 1
         argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters[1:siglength-1]]
         push!(argtypes, llvmtype(Tuple{cg.argtypes.parameters[siglength:end]...}))
@@ -203,7 +202,6 @@ gettypes(cg::CodeCtx, x) = typeof(x)
 
 function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     # name = string(Base.function_name(args[1]))
-    dump(args, maxdepth=3)
     name = string(getname(args[1]))
     @info "$(cg.name): invoking $name"
     if haskey(LLVM.functions(cg.mod), name)
@@ -238,24 +236,20 @@ getfun(x::Method) = getfield(x.module, x.name)
 
 # getname(x::Core.MethodInstance) = getfield(x.def.module, x.def.name)
 function getname(x::Core.MethodInstance)
-    @show nm = x.def.name
-    @show nm = string(getfield(x.def.module, x.def.name))
-    dump(nm)
+    nm = string(getfield(x.def.module, x.def.name))
     if nm != "Type"
         return nm
     end
-    println("HERE****")
     return getname(first(x.def.sig.parameters))   
 end
 
 function getname(x::Method)
-    @show nm = string(getfield(x.module, x.name))
+    nm = string(getfield(x.module, x.name))
     if nm != "Type"
         return nm
     end
-    println("****HERE")
-    @show first(x.sig.parameters)   
-    @show getname(first(x.sig.parameters))   
+    first(x.sig.parameters)   
+    getname(first(x.sig.parameters))   
     return getname(first(x.sig.parameters))   
 end
 # getname(x::Method) = getfield(x.module, getname(x.sig.parameters[1]))
@@ -267,6 +261,8 @@ getargtypes(x::Method) = Tuple{x.sig.parameters[2:end]...}
 function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
     if length(args) == 1 && args[1] != nothing
         res = codegen!(cg, args[1])
+        # @show LLVM.llvmtype(res)
+        # @show llvmtype(cg.result_type)
         if LLVM.llvmtype(res) != llvmtype(cg.result_type)
             res = emit_unbox!(cg, res, cg.result_type)
         end

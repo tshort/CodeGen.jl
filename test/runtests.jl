@@ -246,4 +246,11 @@ end
 @cgtest test_arrays(2.2)
 
 
+function array_len(x)
+    a = Int[3,4,5]
+    return length(a)
+end
+@cgtest array_len(2)
+
+
 nothing

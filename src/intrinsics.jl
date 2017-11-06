@@ -112,7 +112,11 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :zext_int   && return LLVM.zext!(cg.builder, args[2], args[1])
     name == :fpzext     && return LLVM.fpext!(cg.builder, args[2], args[1])
     name == :bitcast    && return LLVM.bitcast!(cg.builder, args[2], args[1])
-    name == :arraylen  && return LLVM.call!(cg.builder, cg.extern[:jl_array_len_], LLVM.Value[args[1]])
+    if name == :arraylen  
+        p = LLVM.bitcast!(cg.builder, args[1], LLVM.PointerType(llvmtype(Tuple{Ptr{Void}, Csize_t})))
+        len_p = LLVM.struct_gep!(cg.builder, p, 1)
+        return LLVM.load!(cg.builder, len_p)
+    end
     # pointerref:
     # pointerset:
 
