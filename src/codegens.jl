@@ -179,9 +179,6 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     fun = eval(args[1])
     name = string(args[1])
     if isa(fun, Core.IntrinsicFunction)
-        @show name
-        @show args[1]
-        dump(args)
         @debug "$(cg.name): calling intrinsic: $name"
         return emit_intrinsic!(cg, args[1].name, args[2:end])
     end
