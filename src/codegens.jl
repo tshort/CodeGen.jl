@@ -22,10 +22,14 @@ files with `write(mod, filepath)`. It can be optimized with
 function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     sig = first(methods(fun, argtypes)).sig
-    funname = string(Base.function_name(fun))
+    funname = getfunname(fun, argtypes)
     cg = CodeCtx(funname, ci, dt, argtypes, sig)
     return codegen!(cg)
 end
+getfunname(fun, argtypes) = string(basename(fun), "_", join(collect(argtypes.parameters), "_"))
+basename(f::Function) = Base.function_name(f)
+basename(m::Core.MethodInstance) = m.def.name
+basename(m::Method) = m.name
 
 #
 # Main entry
@@ -92,7 +96,7 @@ end
 
 function codegen!(cg::CodeCtx, @nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
-    funname = string(Base.function_name(fun))
+    funname = getfunname(fun, argtypes)
     return codegen!(CodeCtx(cg, funname, ci, dt, argtypes))
 end
 
@@ -205,13 +209,13 @@ gettypes(cg::CodeCtx, x) = typeof(x)
 
 function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     # name = string(Base.function_name(args[1]))
-    name = string(getname(args[1]))
+    argtypes = getargtypes(args[1])
+    name = getfunname(args[1], argtypes)
     @info "$(cg.name): invoking $name"
     if haskey(LLVM.functions(cg.mod), name)
         func = LLVM.functions(cg.mod)[name]
     else
         global MI = args[1]
-        argtypes = getargtypes(args[1])
         @debug "$(cg.name): invoke argtypes" args argtypes
         if isa(args[1], Core.MethodInstance) && isdefined(args[1], :inferred) && args[1].inferred != nothing
             MI = args[1]

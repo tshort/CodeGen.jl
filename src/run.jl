@@ -42,7 +42,7 @@ function _jitrun(fun)
     optimize!(mod)
     ci = code_typed(fun, Tuple{})
     restype = last(last(ci))
-    funname = string(first(methods(fun)).name)
+    funname = string(first(methods(fun)).name) * "_"
     res_jl = 0
     LLVM.JIT(mod) do engine
         # LLVM.JIT() won't work with arbitrary inputs.

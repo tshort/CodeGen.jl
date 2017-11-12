@@ -13,13 +13,6 @@ configure_logging(min_level=:debug)
 # @cgtest sqrt(2.0)    # intrinsic issue with add_ptr
 
 
-# @noinline mdisp(x) = 4x
-# @noinline mdisp(x,y) = x + y
-# test_dispatch(x) = mdisp(x) + mdisp(x, 2x)
-# m = codegen(test_dispatch, Tuple{Int})  # codegens, but doesn't make multiple versions of mdisp
-
-
-
 # m = codegen(Base.Math.rem_pio2_kernel, Tuple{Float64})
 # @jitrun(Base.Math.rem_pio2_kernel, 1.1)
 # nothing

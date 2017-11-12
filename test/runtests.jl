@@ -256,4 +256,10 @@ rfib(n) = n < 2 ? n : rfib(n-1) + rfib(n-2)
 @cgtest rfib(9)
 
 
+@noinline mdisp(x) = 4x
+@noinline mdisp(x,y) = x + y
+test_dispatch(x,y) = mdisp(x, y) + mdisp(x)
+@cgtest test_dispatch(1,2)
+
+
 nothing
