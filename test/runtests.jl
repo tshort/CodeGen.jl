@@ -258,8 +258,9 @@ rfib(n) = n < 2 ? n : rfib(n-1) + rfib(n-2)
 
 @noinline mdisp(x) = 4x
 @noinline mdisp(x,y) = x + y
-test_dispatch(x,y) = mdisp(x, y) + mdisp(x)
+test_dispatch(x,y) = mdisp(x, y) + mdisp(x) + mdisp(y)
 @cgtest test_dispatch(1,2)
+@cgtest test_dispatch(1,2.0)
 
 
 nothing
