@@ -156,7 +156,7 @@ function codegen!(cg::CodeCtx, f::GlobalRef)
     if isa(evf, Type)
         return codegen!(cg, evf)
     else
-        # Also need to store global variables
+        # If we refer to something global that we don't have, need to add it as a global variable.
         return emit_box!(cg, Int32(999)) # KLUDGE - WRONG
     end
 end
@@ -179,6 +179,9 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     fun = eval(args[1])
     name = string(args[1])
     if isa(fun, Core.IntrinsicFunction)
+        @show name
+        @show args[1]
+        dump(args)
         @debug "$(cg.name): calling intrinsic: $name"
         return emit_intrinsic!(cg, args[1].name, args[2:end])
     end

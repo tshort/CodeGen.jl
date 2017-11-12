@@ -9,9 +9,16 @@ configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
 
-m = codegen(Base.Math.rem_pio2_kernel, Tuple{Float64})
+
+# @cgtest sqrt(2.0)
+
+
+
+
+
+# m = codegen(Base.Math.rem_pio2_kernel, Tuple{Float64})
 # @jitrun(Base.Math.rem_pio2_kernel, 1.1)
-nothing
+# nothing
 
 
 

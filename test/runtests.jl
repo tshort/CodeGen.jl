@@ -252,6 +252,8 @@ end
 @cgtest array_len(2)
 
 
-@cgtest sqrt(2.0)
+rfib(n) = n < 2 ? n : rfib(n-1) + rfib(n-2)
+@cgtest rfib(9)
+
 
 nothing
