@@ -2,7 +2,7 @@
 
 **This package is experimental and a work in progress.**
 
-The main purpose of this package is to generate LLVM IR from Julia code. It is targeted (for now) at static code. The resulting IR can be save to a bitcode (.bc) file that can be compiled with Clang.
+The main purpose of this package is to generate LLVM IR from Julia code. It is targeted (for now) at static code. The resulting IR can be save to a bitcode (.bc) file that can be compiled with Clang. It requires Julia dev-0.7.
 
 Example:
 
