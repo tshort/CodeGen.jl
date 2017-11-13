@@ -263,4 +263,18 @@ test_dispatch(x,y) = mdisp(x, y) + mdisp(x) + mdisp(y)
 @cgtest test_dispatch(1,2.0)
 
 
+@cgtest Base.shl_int(4096,2)
+@cgtest Base.shl_int(UInt(4096),2)
+@cgtest Base.shl_int(UInt16(4096),2)
+@cgtest Base.shl_int(4096,UInt8(2))
+@cgtest Base.lshr_int(4096,2)
+@cgtest Base.lshr_int(UInt(4096),2)
+@cgtest Base.lshr_int(UInt16(4096),2)
+@cgtest Base.lshr_int(4096,UInt8(2))
+@cgtest Base.ashr_int(4096,2)
+@cgtest Base.ashr_int(UInt(4096),2)
+@cgtest Base.ashr_int(UInt16(4096),2)
+@cgtest Base.ashr_int(4096,UInt8(2))
+
+
 nothing

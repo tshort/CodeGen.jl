@@ -6,6 +6,13 @@ make_intrinsic_arg!(cg, x) = codegen!(cg, x)
 make_intrinsic_arg!(cg, x::Type{T}) where {T} = llvmtype(x)
 make_intrinsic_arg!(cg, x::GlobalRef) = make_intrinsic_arg!(cg, eval(x))
 
+function uint_cnvt!(cg, to, x)
+    t = LLVM.llvmtype(x)
+    t == to && return x
+    width(to) < width(t) && return LLVM.trunc!(cg.builder, x, to)
+    return LLVM.zext!(cg.builder, x, to)
+end
+
 function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     args = Any[]
     for v in jlargs
@@ -111,7 +118,6 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :sext_int   && return LLVM.sext!(cg.builder, args[2], args[1])
     name == :zext_int   && return LLVM.zext!(cg.builder, args[2], args[1])
     name == :fpzext     && return LLVM.fpext!(cg.builder, args[2], args[1])
-    name == :bitcast    && return LLVM.bitcast!(cg.builder, args[2], args[1])
     if name == :arraylen  
         p = LLVM.bitcast!(cg.builder, args[1], LLVM.PointerType(llvmtype(Tuple{Ptr{Void}, Csize_t})))
         len_p = LLVM.struct_gep!(cg.builder, p, 1)
@@ -120,29 +126,33 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     # pointerref:
     # pointerset:
 
+    t1 = LLVM.llvmtype(args[1])
+    if name == :shl_int
+        t2 = LLVM.llvmtype(args[2])
+        return LLVM.select!(cg.builder, 
+                            LLVM.icmp!(cg.builder, LLVM.API.LLVMIntUGE, args[2], LLVM.ConstantInt(t2, width(t1))),
+                            LLVM.ConstantInt(t1, 0),
+                            LLVM.shl!(cg.builder, args[1], uint_cnvt!(cg, t1, args[2])))
+    end 
+    if name == :ashr_int
+        t2 = LLVM.llvmtype(args[2])
+        return LLVM.select!(cg.builder, 
+                            LLVM.icmp!(cg.builder, LLVM.API.LLVMIntUGE, args[2], LLVM.ConstantInt(t2, width(t1))),
+                            LLVM.ConstantInt(t1, 0),
+                            LLVM.ashr!(cg.builder, args[1], uint_cnvt!(cg, t1, args[2])))
+    end
+    if name == :lshr_int
+        t2 = LLVM.llvmtype(args[2])
+        return LLVM.select!(cg.builder, 
+                            LLVM.icmp!(cg.builder, LLVM.API.LLVMIntUGE, args[2], LLVM.ConstantInt(t2, width(t1))),
+                            LLVM.ConstantInt(t1, 0),
+                            LLVM.lshr!(cg.builder, args[1], uint_cnvt!(cg, t1, args[2])))
+    end
     ######
     ## NOT UNIVERSAL, but maybe useful for getting a few things to work
     name == :select_value && return LLVM.select!(cg.builder, emit_condition!(cg, args[1]), args[2], args[3])
     name == :not_int      && return LLVM.not!(cg.builder, emit_condition!(cg, args[1]))
-    name == :shl_int  && return LLVM.shl!(cg.builder, args[1], args[2])    # WRONG - FIX
-    name == :lshr_int  && return LLVM.lshr!(cg.builder, args[1], args[2])    # WRONG - FIX
-    name == :ashr_int  && return LLVM.ashr!(cg.builder, args[1], args[2])    # WRONG - FIX
-    # if name == :lshr_int
-    #     t = LLVM.llvmtype(args[1])
-    #     return LLVM.select!(cg.builder, 
-    #                         LLVM.icmp!(cg.builder, LLVM.API.LLVMIntUGE, args[2], 
-    #                                    ) 
-    #     )
-    # end
-
-    # case lshr_int:
-    #     return ctx.builder.CreateSelect(
-    #             ctx.builder.CreateICmpUGE(y, ConstantInt::get(y->getType(),
-    #                                                       t->getPrimitiveSizeInBits())),
-    #             ConstantInt::get(t, 0),
-    #             ctx.builder.CreateLShr(x, uint_cnvt(ctx, t, y)));
-    # ashr_int
-    ######
+    name == :bitcast      && return LLVM.bitcast!(cg.builder, args[2], args[1])  # not completely general
 
     error("Unsupported intrinsic: $name")
 end
