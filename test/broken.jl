@@ -13,6 +13,7 @@ configure_logging(min_level=:debug)
 # @cgtest sqrt(2.0)    # intrinsic issue with add_ptr
 
 
+m = codegen(Base.Math.paynehanek, Tuple{Float64})
 # m = codegen(Base.Math.rem_pio2_kernel, Tuple{Float64})
 # @jitrun(Base.Math.rem_pio2_kernel, 1.1)
 # nothing

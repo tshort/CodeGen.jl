@@ -126,28 +126,18 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     # pointerref:
     # pointerset:
 
-    t1 = LLVM.llvmtype(args[1])
-    if name == :shl_int
+    function emit_sh!(fun)
+        t1 = LLVM.llvmtype(args[1])
         t2 = LLVM.llvmtype(args[2])
         return LLVM.select!(cg.builder, 
                             LLVM.icmp!(cg.builder, LLVM.API.LLVMIntUGE, args[2], LLVM.ConstantInt(t2, width(t1))),
                             LLVM.ConstantInt(t1, 0),
-                            LLVM.shl!(cg.builder, args[1], uint_cnvt!(cg, t1, args[2])))
-    end 
-    if name == :ashr_int
-        t2 = LLVM.llvmtype(args[2])
-        return LLVM.select!(cg.builder, 
-                            LLVM.icmp!(cg.builder, LLVM.API.LLVMIntUGE, args[2], LLVM.ConstantInt(t2, width(t1))),
-                            LLVM.ConstantInt(t1, 0),
-                            LLVM.ashr!(cg.builder, args[1], uint_cnvt!(cg, t1, args[2])))
+                            fun(cg.builder, args[1], uint_cnvt!(cg, t1, args[2])))
     end
-    if name == :lshr_int
-        t2 = LLVM.llvmtype(args[2])
-        return LLVM.select!(cg.builder, 
-                            LLVM.icmp!(cg.builder, LLVM.API.LLVMIntUGE, args[2], LLVM.ConstantInt(t2, width(t1))),
-                            LLVM.ConstantInt(t1, 0),
-                            LLVM.lshr!(cg.builder, args[1], uint_cnvt!(cg, t1, args[2])))
-    end
+    name == :shl_int  && return emit_sh!(LLVM.shl!)
+    name == :ashr_int && return emit_sh!(LLVM.ashr!)
+    name == :lshr_int && return emit_sh!(LLVM.lshr!)
+
     ######
     ## NOT UNIVERSAL, but maybe useful for getting a few things to work
     name == :select_value && return LLVM.select!(cg.builder, emit_condition!(cg, args[1]), args[2], args[3])
