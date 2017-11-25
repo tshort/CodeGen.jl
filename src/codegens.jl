@@ -97,7 +97,8 @@ end
 function codegen!(cg::CodeCtx, @nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     funname = getfunname(fun, argtypes)
-    return codegen!(CodeCtx(cg, funname, ci, dt, argtypes))
+    sig = first(methods(fun, argtypes)).sig
+    return codegen!(CodeCtx(cg, funname, ci, dt, argtypes, sig))
 end
 
 
@@ -350,7 +351,7 @@ function codegen!(cg::CodeCtx, ::Val{:foreigncall}, args, typ)
         func = cg.extern[name]
     else
         @debug "$(cg.name) ccall creating: $name"
-        func = extern!(cg.mod, name, llvmtype(args[2]), llvmtype.(collect(args[3])))
+        func = extern!(cg.mod, name, llvmtype(args[2]), LLVMType[llvmtype(x) for x in collect(args[3])])
         cg.extern[name] = func
     end
     llvmargs = LLVM.Value[]
