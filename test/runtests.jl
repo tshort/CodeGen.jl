@@ -33,6 +33,8 @@ array_index(x) = Int[3,2x][2]
 
 
 array_max(x) = maximum(Int[4,3x])
+m = codegen(array_max, Tuple{Int})
+# verify(m)
 @test @jitrun(array_max, -1) == array_max(-1)
 @cgtest array_max(2)
 @cgtest array_max(-1)

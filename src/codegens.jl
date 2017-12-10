@@ -162,7 +162,8 @@ function codegen!(cg::CodeCtx, f::GlobalRef)
         return codegen!(cg, evf)
     else
         # If we refer to something global that we don't have, need to add it as a global variable.
-        return emit_box!(cg, Int32(999)) # KLUDGE - WRONG
+        # return emit_box!(cg, Int32(999)) # KLUDGE - WRONG
+        return codegen!(cg, Int32(999)) # KLUDGE - WRONG
     end
 end
 

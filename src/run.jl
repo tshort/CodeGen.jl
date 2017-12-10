@@ -37,7 +37,7 @@ macro jitrun(fun, args...)
 end
 function _jitrun(fun)
     # LLVM.@apicall(:LLVMLinkInJIT,LLVM.API.LLVMBool,())
-    LLVM.API.LLVMInitializeNativeTarget()
+    # LLVM.API.LLVMInitializeNativeTarget()
     mod = codegen(fun, Tuple{})
     optimize!(mod)
     ci = code_typed(fun, Tuple{})
