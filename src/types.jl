@@ -32,8 +32,8 @@ mutable struct CodeCtx <: AbstractCodeCtx
             argtypes,
             sig,
             length(argtypes.parameters),
-            Vector{LLVM.Value}(length(ci.slotnames)),
-            Vector{Any}(length(ci.slotnames)),
+            Vector{LLVM.Value}(uninitialized, length(ci.slotnames)),
+            Vector{Any}(uninitialized, length(ci.slotnames)),
             Dict{Int, LLVM.Value}(),
             Dict{Int, Any}(),
             Dict{Symbol, Any}()
@@ -66,6 +66,7 @@ end
 
 function CodeCtx(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing)
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    @show ci
     sig = first(methods(fun, argtypes)).sig
     funname = string(Base.function_name(fun))
     cg = CodeCtx(funname, ci, dt, argtypes)
@@ -76,6 +77,7 @@ end
 # This is for testing
 function CodeCtx_init(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing)
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    @show ci
     sig = first(methods(fun, argtypes)).sig
     funname = string(Base.function_name(fun))
     cg = CodeCtx(funname, ci, dt, argtypes, sig)

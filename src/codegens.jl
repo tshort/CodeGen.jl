@@ -21,6 +21,7 @@ files with `write(mod, filepath)`. It can be optimized with
 """
 function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    @show ci
     sig = first(methods(fun, argtypes)).sig
     funname = getfunname(fun, argtypes)
     cg = CodeCtx(funname, ci, dt, argtypes, sig)
@@ -96,6 +97,7 @@ end
 
 function codegen!(cg::CodeCtx, @nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
+    @show ci
     funname = getfunname(fun, argtypes)
     sig = first(methods(fun, argtypes)).sig
     return codegen!(CodeCtx(cg, funname, ci, dt, argtypes, sig))
@@ -230,6 +232,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
             ci, dt = code_typed(fun, argtypes, optimize = true)[1]
             sig = first(methods(fun, argtypes)).sig
         end
+        @show ci
         newcg = CodeCtx(cg, name, ci, dt, argtypes, sig)
         codegen!(newcg)
         func = newcg.func
@@ -485,7 +488,8 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
         # LLVMType[jl_sym_t_ptr, jl_module_t_ptr, jl_datatype_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, jl_svec_t_ptr, int32_t, int32_t, int32_t])
     loc = LLVM.GlobalVariable(cg.mod, jl_datatype_t_ptr, string(JT))
     LLVM.linkage!(loc, LLVM.API.LLVMCommonLinkage)
-    LLVM.initializer!(loc, null(LLVM.Int64Type(ctx)))
+    # LLVM.initializer!(loc, null(jl_value_t_ptr))
+    LLVM.API.LLVMSetInitializer(LLVM.ref(loc), LLVM.ref(null(jl_value_t_ptr)))
     store!(cg, dt, loc)
     result = LLVM.load!(cg.builder, loc)
     cg.datatype[JT] = result

@@ -5,15 +5,31 @@ using CodeGen
 using LLVM
 using MicroLogging
 
-configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
+configure_logging(min_level=:info)
+
+mutable struct X
+    x::Int
+end
+
+@noinline f(x) = X(x)
+
+g(x) = f(x).x + x
+
+m = codegen(g, Tuple{Int})
+verify(m)
 
 
+
+
+# array_sum(x) = sum(Int[3,x])
+# m = codegen(array_sum, Tuple{Int})
+# verify(m)
 
 # @cgtest sqrt(2.0)    # intrinsic issue with add_ptr
 
 
-m = codegen(Base.Math.paynehanek, Tuple{Float64})
+# m = codegen(Base.Math.paynehanek, Tuple{Float64})
 # m = codegen(Base.Math.rem_pio2_kernel, Tuple{Float64})
 # @jitrun(Base.Math.rem_pio2_kernel, 1.1)
 # nothing
