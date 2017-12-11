@@ -8,23 +8,16 @@ using MicroLogging
 configure_logging(min_level=:debug)
 configure_logging(min_level=:info)
 
-mutable struct X
-    x::Int
-end
 
-@noinline f(x) = X(x)
-
-g(x) = f(x).x + x
-
-m = codegen(g, Tuple{Int})
+array_sum(x) = sum(Int[3,x])
+m = codegen(array_sum, Tuple{Int})
 verify(m)
 
-
-
-
-# array_sum(x) = sum(Int[3,x])
-# m = codegen(array_sum, Tuple{Int})
+# f(x) = string("a", x)
+# m = codegen(f, Tuple{Int})
 # verify(m)
+
+
 
 # @cgtest sqrt(2.0)    # intrinsic issue with add_ptr
 

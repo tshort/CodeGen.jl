@@ -279,4 +279,14 @@ test_dispatch(x,y) = mdisp(x, y) + mdisp(x) + mdisp(y)
 @cgtest Base.ashr_int(4096,UInt8(2))
 
 
+
+mutable struct X
+    x::Int
+end
+@noinline f(x) = X(x)
+g(x) = f(x).x + x
+m = codegen(g, Tuple{Int})
+verify(m)
+
+
 nothing
