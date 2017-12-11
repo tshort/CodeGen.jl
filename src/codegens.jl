@@ -148,6 +148,8 @@ function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
         #     return
         # end
         @debug "$(cg.name): Assigning SSA $(args[1].id)" typ llvmtype(_typeof(cg, args[1]))
+        @info "$(cg.name): Assigning SSA $(args[1].id) $typ $result $(llvmtype(_typeof(cg, args[1])))"
+        dump(args)
         unboxed_result = emit_unbox!(cg, result, _typeof(cg, args[1]))
         p = alloca!(cg.builder, llvmtype(_typeof(cg, args[1])))
         store!(cg, unboxed_result, p)
@@ -189,6 +191,8 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     name = string(args[1])
     if isa(fun, Core.IntrinsicFunction)
         @debug "$(cg.name): calling intrinsic: $name"
+        @info "$(cg.name): calling intrinsic: $name"
+        dump(args)
         return emit_intrinsic!(cg, args[1].name, args[2:end])
     end
     if isa(fun, Core.Builtin)
@@ -352,7 +356,7 @@ codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
 codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1])
 
 codegen!(cg::CodeCtx, ::Val{:simdloop}, args, typ) = nothing
-codegen!(cg::CodeCtx, ::Val{:gc_preserve_begin}, args, typ) = nothing
+codegen!(cg::CodeCtx, ::Val{:gc_preserve_begin}, args, typ) = codegen!(cg, args[1])
 
 
 #

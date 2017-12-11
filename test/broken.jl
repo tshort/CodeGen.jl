@@ -9,13 +9,13 @@ configure_logging(min_level=:debug)
 configure_logging(min_level=:info)
 
 
-array_sum(x) = sum(Int[3,x])
-m = codegen(array_sum, Tuple{Int})
-verify(m)
-
-# f(x) = string("a", x)
-# m = codegen(f, Tuple{Int})
+# array_sum(x) = sum(Int[3,x])
+# m = codegen(array_sum, Tuple{Int})
 # verify(m)
+
+f(x) = string("a", x)
+m = codegen(f, Tuple{Int})
+verify(m)
 
 
 
