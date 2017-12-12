@@ -360,6 +360,7 @@ codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1
 
 codegen!(cg::CodeCtx, ::Val{:simdloop}, args, typ) = nothing
 codegen!(cg::CodeCtx, ::Val{:gc_preserve_begin}, args, typ) = codegen!(cg, args[1])
+codegen!(cg::CodeCtx, ::Val{:gc_preserve_end}, args, typ) = codegen!(cg, args[1])
 
 
 #

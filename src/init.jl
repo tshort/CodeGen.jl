@@ -92,7 +92,10 @@ function setup_externs!(mod)
     e[:jl_new_bits] = extern!(mod, "jl_new_bits", jl_value_t_ptr, LLVMType[jl_value_t_ptr, jl_value_t_ptr])
     e[:jl_set_nth_field] = extern!(mod, "jl_set_nth_field", void_t, LLVMType[jl_value_t_ptr, int32_t, jl_value_t_ptr])
     e[:jl_pchar_to_string] = extern!(mod, "jl_pchar_to_string", jl_value_t_ptr, LLVMType[int8_t_ptr, uint32_t])
-    
+
+    e[:jl_pointerref] = extern!(mod, "jl_pointerref", jl_value_t_ptr, LLVMType[jl_value_t_ptr, jl_value_t_ptr, jl_value_t_ptr])
+    e[:jl_pointerset] = extern!(mod, "jl_pointerset", jl_value_t_ptr, LLVMType[jl_value_t_ptr, jl_value_t_ptr, jl_value_t_ptr, jl_value_t_ptr])
+
     e[:jl_symbol] = extern!(mod, "jl_symbol", jl_sym_t_ptr, LLVMType[int8_t_ptr])
     e[:jl_svec] = extern!(mod, "jl_svec", jl_svec_t_ptr, LLVMType[], vararg = true)
     e[:jl_new_datatype] = extern!(mod, "jl_new_datatype", jl_datatype_t_ptr, 

@@ -123,8 +123,6 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
         len_p = LLVM.struct_gep!(cg.builder, p, 1)
         return LLVM.load!(cg.builder, len_p)
     end
-    # pointerref:
-    # pointerset:
 
     function emit_sh!(fun)
         t1 = LLVM.llvmtype(args[1])
@@ -156,6 +154,11 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
                                                         [LLVM.neg!(cg.builder, args[2])]), 
                                               LLVM.llvmtype(args[1]))
 
+    ######
+    # name == :pointerref && return LLVM.call!(cg.builder, cg.extern[:jl_pointerref], LLVM.Value[emit_box!(cg, args[1]), emit_box!(cg, args[2]), emit_box!(cg, args[3])])
+    # name == :pointerset && return LLVM.call!(cg.builder, cg.extern[:jl_pointerset], LLVM.Value[emit_box!(cg, args[1]), emit_box!(cg, args[2]), emit_box!(cg, args[3]), emit_box!(cg, args[4])])
+    name == :pointerref && return LLVM.call!(cg.builder, cg.extern[:jl_pointerref], LLVM.Value[args[1], args[2], args[3]])
+    name == :pointerset && return LLVM.call!(cg.builder, cg.extern[:jl_pointerset], LLVM.Value[args[1], args[2], args[3], args[4]])
 
     error("Unsupported intrinsic: $name")
 end
