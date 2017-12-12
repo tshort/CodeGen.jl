@@ -144,6 +144,19 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :not_int      && return LLVM.not!(cg.builder, emit_condition!(cg, args[1]))
     name == :bitcast      && return LLVM.bitcast!(cg.builder, args[2], args[1])  # not completely general
 
+    ######
+    name == :add_ptr && return LLVM.ptrtoint!(cg.builder, 
+                                              LLVM.gep!(cg.builder, 
+                                                        LLVM.inttoptr!(cg.builder, args[1], int8_t_ptr), 
+                                                        [args[2]]), 
+                                              LLVM.llvmtype(args[1])) 
+    name == :sub_ptr && return LLVM.ptrtoint!(cg.builder, 
+                                              LLVM.gep!(cg.builder, 
+                                                        LLVM.inttoptr!(cg.builder, args[1], int8_t_ptr), 
+                                                        [LLVM.neg!(cg.builder, args[2])]), 
+                                              LLVM.llvmtype(args[1]))
+
+
     error("Unsupported intrinsic: $name")
 end
 
