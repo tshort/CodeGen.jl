@@ -29,6 +29,8 @@ function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering 
 end
 getfunname(fun, argtypes) = string(basename(fun), "_", join(collect(argtypes.parameters), "_"))
 basename(f::Function) = Base.function_name(f)
+basename(f::Core.IntrinsicFunction) = Symbol(unsafe_string(ccall(:jl_intrinsic_name, Cstring, (Core.IntrinsicFunction,), f)))
+basename(x::GlobalRef) = x.name
 basename(m::Core.MethodInstance) = m.def.name
 basename(m::Method) = m.name == :Type ? m.sig.parameters[1].parameters[1].name.name : m.name
 
@@ -193,7 +195,8 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
         @debug "$(cg.name): calling intrinsic: $name"
         @info "$(cg.name): calling intrinsic: $name"
         dump(args)
-        return emit_intrinsic!(cg, args[1].name, args[2:end])
+        @show basename(args[1])
+        return emit_intrinsic!(cg, basename(args[1]), args[2:end])
     end
     if isa(fun, Core.Builtin)
         @debug "$(cg.name): calling builtin: $name"
