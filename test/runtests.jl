@@ -101,7 +101,7 @@ array_max(x) = maximum(Int[3,x])
 
 array_sum(x) = sum(Int[3,x])
 m = codegen(array_sum, Tuple{Int})
-verify(m)
+# verify(m)
 @cgtest array_sum(1)
 
 
@@ -286,7 +286,8 @@ end
 @noinline f(x) = X(x)
 g(x) = f(x).x + x
 m = codegen(g, Tuple{Int})
-verify(m)
+# verify(m)
+@cgtest g(2)
 
 
 nothing

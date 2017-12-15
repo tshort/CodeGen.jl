@@ -56,17 +56,30 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
         cg.extern[Symbol("llvm.fmuladd.$(ltyp(args[1]))")], 
         LLVM.Value[args[1], args[2], args[3]])
 
-    ## WRONG. Next, need all of the "checked" intrinsics.
-    name == :checked_sadd_int  && return LLVM.add!(cg.builder, args[1], args[2])
-    name == :checked_uadd_int  && return LLVM.add!(cg.builder, args[1], args[2])
-    name == :checked_ssub_int  && return LLVM.sub!(cg.builder, args[1], args[2])
-    name == :checked_usub_int  && return LLVM.sub!(cg.builder, args[1], args[2])
-    name == :checked_smul_int  && return LLVM.mul!(cg.builder, args[1], args[2])
-    name == :checked_umul_int  && return LLVM.mul!(cg.builder, args[1], args[2])
-    name == :checked_sdiv_int  && return LLVM.sdiv!(cg.builder, args[1], args[2])
-    name == :checked_udiv_int  && return LLVM.udiv!(cg.builder, args[1], args[2])
-    name == :checked_srem_int  && return LLVM.srem!(cg.builder, args[1], args[2])
-    name == :checked_urem_int  && return LLVM.urem!(cg.builder, args[1], args[2])
+
+    function checked_int(sym)
+        ifun = cg.extern[Symbol("llvm.checked.$sym.int.$(ltyp(args[1]))")] 
+        res = LLVM.call!(cg.builder, ifun, LLVM.Value[args[1], args[2]])
+        # @show cg.mod
+        val = LLVM.extract_value!(cg.builder, res, 0)
+        obit = LLVM.extract_value!(cg.builder, res, 1)
+        obyte = LLVM.zext!(cg.builder, obit, int8_t)
+        tupptr = alloca!(cg.builder, LLVM.StructType([LLVM.llvmtype(args[1]), int8_t], CodeGen.ctx))
+        store!(cg, val,   LLVM.struct_gep!(cg.builder, tupptr, 0))
+        store!(cg, obyte, LLVM.struct_gep!(cg.builder, tupptr, 1))
+        return LLVM.load!(cg.builder, tupptr)
+    end
+
+    name == :checked_sadd_int  && return checked_int(:sadd)
+    name == :checked_uadd_int  && return checked_int(:uadd)
+    name == :checked_ssub_int  && return checked_int(:ssub)
+    name == :checked_usub_int  && return checked_int(:usub)
+    name == :checked_smul_int  && return checked_int(:smul)
+    name == :checked_umul_int  && return checked_int(:umul)
+    # name == :checked_sdiv_int  && return LLVM.sdiv!(cg.builder, args[1], args[2])
+    # name == :checked_udiv_int  && return LLVM.udiv!(cg.builder, args[1], args[2])
+    # name == :checked_srem_int  && return LLVM.srem!(cg.builder, args[1], args[2])
+    # name == :checked_urem_int  && return LLVM.urem!(cg.builder, args[1], args[2])
     ##
     name == :eq_int  && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntEQ, args[1], args[2])
     name == :ne_int  && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntNE, args[1], args[2])
