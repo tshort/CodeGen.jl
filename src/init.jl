@@ -109,7 +109,7 @@ function setup_externs!(mod)
             e[name] = extern!(mod, string(name), li, LLVMType[li])
         end 
         for funsym in [:sadd, :uadd, :ssub, :usub, :smul, :umul]
-            name = Symbol("llvm.checked.", funsym, ".int.", li)
+            name = Symbol("llvm.", funsym, ".with.overflow.", li)
             e[name] = extern!(mod, string(name), LLVM.StructType([li, int1_t], CodeGen.ctx), LLVMType[li, li])
         end 
         name = Symbol("llvm.ctlz.", li)

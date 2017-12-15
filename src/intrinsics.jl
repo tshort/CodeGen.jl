@@ -58,9 +58,8 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
 
 
     function checked_int(sym)
-        ifun = cg.extern[Symbol("llvm.checked.$sym.int.$(ltyp(args[1]))")] 
+        ifun = cg.extern[Symbol("llvm.$sym.with.overflow.$(ltyp(args[1]))")] 
         res = LLVM.call!(cg.builder, ifun, LLVM.Value[args[1], args[2]])
-        # @show cg.mod
         val = LLVM.extract_value!(cg.builder, res, 0)
         obit = LLVM.extract_value!(cg.builder, res, 1)
         obyte = LLVM.zext!(cg.builder, obit, int8_t)

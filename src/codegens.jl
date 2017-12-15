@@ -21,7 +21,6 @@ files with `write(mod, filepath)`. It can be optimized with
 """
 function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true, triple = nothing, datalayout = nothing) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
-    @show ci
     sig = first(methods(fun, argtypes)).sig
     funname = getfunname(fun, argtypes)
     cg = CodeCtx(funname, ci, dt, argtypes, sig)
@@ -52,7 +51,6 @@ function codegen!(cg::CodeCtx)
     siglen(x) = length(x.parameters)
     siglen(x::UnionAll) = siglen(x.body)
     sigend = lastsig(cg.sig)
-    # @show hasvararg = isa(sigend, UnionAll) && sigend.body <: Vararg
     hasvararg = isa(sigend, UnionAll) && sigend.body.name.name == :Vararg
     if hasvararg
         siglength = siglen(cg.sig) - 1
@@ -90,7 +88,6 @@ function codegen!(cg::CodeCtx)
     end
     for (i, node) in enumerate(ci.code)
         @debug "$(cg.name): node $i/$(length(ci.code))" node
-        @show node
         codegen!(cg, node)
     end
     # LLVM.verify(cg.func)
@@ -100,7 +97,6 @@ end
 
 function codegen!(cg::CodeCtx, @nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
-    @show ci
     funname = getfunname(fun, argtypes)
     sig = first(methods(fun, argtypes)).sig
     return codegen!(CodeCtx(cg, funname, ci, dt, argtypes, sig))
@@ -249,8 +245,6 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
             ci, dt = methodtable[1]
             sig = first(methods(fun, argtypes)).sig
         end
-        # @show ci
-        # dump(ci, maxdepth=9)
         newcg = CodeCtx(cg, name, ci, dt, argtypes, sig)
         codegen!(newcg)
         func = newcg.func
