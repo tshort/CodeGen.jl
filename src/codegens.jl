@@ -288,7 +288,9 @@ function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
         res = codegen!(cg, args[1])
         # @show LLVM.llvmtype(res)
         # @show llvmtype(cg.result_type)
-        if LLVM.llvmtype(res) != llvmtype(cg.result_type)
+        if LLVM.llvmtype(res) == int1_t
+            res = LLVM.zext!(cg.builder, res, int8_t)
+        elseif LLVM.llvmtype(res) != llvmtype(cg.result_type)
             res = emit_unbox!(cg, res, cg.result_type)
         end
         LLVM.ret!(cg.builder, res)
@@ -474,7 +476,8 @@ codegen!(cg::CodeCtx, x::Type{T}) where T = load_and_emit_datatype!(cg, x)
 
 function load_and_emit_datatype!(cg, ::Type{JT}) where JT
     if haskey(cg.datatype, JT)
-        return LLVM.load!(cg.builder, cg.datatype[JT])
+        # return LLVM.load!(cg.builder, cg.datatype[JT])
+        return cg.datatype[JT]
     end
     name = string(JT)
     @info "$(cg.name): emitting new type: $name"

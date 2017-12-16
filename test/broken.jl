@@ -5,13 +5,30 @@ using CodeGen
 using LLVM
 using MicroLogging
 
-configure_logging(min_level=:debug)
 configure_logging(min_level=:info)
+configure_logging(min_level=:debug)
 
-
-array_sum(x) = sum(Int[3,x])
-m = codegen(array_sum, Tuple{Int})
+function test_arrays(x)
+    y = Int[1,2,x]
+    yy = Int[3,4,5]
+    zz = y .+ yy
+    return zz[1]
+end
+m = codegen(test_arrays, Tuple{Int})
 verify(m)
+
+# function test_arrays(x)
+#     y = fill(x, 5)
+#     yy = fill(2x, 5)
+#     # push!(y, 3x)
+#     # z = reverse(y)
+#     zz = y .+ yy.^2
+#     return zz[1]
+# end
+# m = codegen(test_arrays, Tuple{Int})
+# verify(m)
+
+
 
 # f(x) = string("a", x)
 # m = codegen(f, Tuple{Int})

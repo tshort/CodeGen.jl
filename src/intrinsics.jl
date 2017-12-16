@@ -80,22 +80,26 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     # name == :checked_srem_int  && return LLVM.srem!(cg.builder, args[1], args[2])
     # name == :checked_urem_int  && return LLVM.urem!(cg.builder, args[1], args[2])
     ##
-    name == :eq_int  && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntEQ, args[1], args[2])
-    name == :ne_int  && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntNE, args[1], args[2])
-    name == :slt_int && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntSLT, args[1], args[2])
-    name == :ult_int && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntULT, args[1], args[2])
-    name == :sle_int && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntSLE, args[1], args[2])
-    name == :ule_int && return LLVM.icmp!(cg.builder, LLVM.API.LLVMIntULE, args[1], args[2])
-    name == :eq_float && return LLVM.fcmp!(cg.builder, LLVM.API.LLVMRealOEQ, args[1], args[2])
-    name == :ne_float && return LLVM.fcmp!(cg.builder, LLVM.API.LLVMRealONE, args[1], args[2])
-    name == :lt_float && return LLVM.fcmp!(cg.builder, LLVM.API.LLVMRealOLT, args[1], args[2])
-    name == :le_float && return LLVM.fcmp!(cg.builder, LLVM.API.LLVMRealOLE, args[1], args[2])
+
+    emit_bool!(x) = LLVM.zext!(cg.builder, x, int8_t)
+    emit_icmp!(fun) = emit_bool!(LLVM.icmp!(cg.builder, fun, args[1], args[2]))
+    emit_fcmp!(fun) = emit_bool!(LLVM.fcmp!(cg.builder, fun, args[1], args[2]))
+    name == :eq_int  && return emit_icmp!(LLVM.API.LLVMIntEQ)
+    name == :ne_int  && return emit_icmp!(LLVM.API.LLVMIntNE)
+    name == :slt_int && return emit_icmp!(LLVM.API.LLVMIntSLT)
+    name == :ult_int && return emit_icmp!(LLVM.API.LLVMIntULT)
+    name == :sle_int && return emit_icmp!(LLVM.API.LLVMIntSLE)
+    name == :ule_int && return emit_icmp!(LLVM.API.LLVMIntULE)
+    name == :eq_float && return emit_fcmp!(LLVM.API.LLVMRealOEQ)
+    name == :ne_float && return emit_fcmp!(LLVM.API.LLVMRealONE)
+    name == :lt_float && return emit_fcmp!(LLVM.API.LLVMRealOLT)
+    name == :le_float && return emit_fcmp!(LLVM.API.LLVMRealOLE)
     ## need fast versions of above
     # fpiseq
     # fpislt
-    name == :and_int  && return LLVM.and!(cg.builder, args[1], args[2])
-    name == :or_int   && return LLVM.or!(cg.builder, args[1], args[2])
-    name == :xor_int  && return LLVM.xor!(cg.builder, args[1], args[2])
+    name == :and_int  && return emit_bool!(LLVM.and!(cg.builder, args[1], args[2]))
+    name == :or_int   && return emit_bool!(LLVM.or!(cg.builder, args[1], args[2]))
+    name == :xor_int  && return emit_bool!(LLVM.xor!(cg.builder, args[1], args[2]))
 
     a1(name) = LLVM.call!(cg.builder, cg.extern[Symbol("llvm.$name.$(ltyp(args[1]))")], LLVM.Value[args[1]])
 
@@ -151,7 +155,7 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     ######
     ## NOT UNIVERSAL, but maybe useful for getting a few things to work
     name == :select_value && return LLVM.select!(cg.builder, emit_condition!(cg, args[1]), args[2], args[3])
-    name == :not_int      && return LLVM.not!(cg.builder, emit_condition!(cg, args[1]))
+    name == :not_int      && return emit_bool!(LLVM.not!(cg.builder, emit_condition!(cg, args[1])))
     name == :bitcast      && return LLVM.bitcast!(cg.builder, args[2], args[1])  # not completely general
 
     ######
