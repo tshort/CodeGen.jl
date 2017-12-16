@@ -30,7 +30,7 @@ getfunname(fun, argtypes) = string(basename(fun), "_", join(collect(argtypes.par
 basename(f::Function) = Base.function_name(f)
 basename(f::Core.IntrinsicFunction) = Symbol(unsafe_string(ccall(:jl_intrinsic_name, Cstring, (Core.IntrinsicFunction,), f)))
 basename(x::GlobalRef) = x.name
-basename(m::Core.MethodInstance) = m.def.name
+basename(m::Core.MethodInstance) = basename(m.def)
 basename(m::Method) = m.name == :Type ? m.sig.parameters[1].parameters[1].name.name : m.name
 
 #
@@ -223,6 +223,8 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     argtypes = getargtypes(args[1])
     name = getfunname(args[1], argtypes)
     @info "$(cg.name): invoking $name"
+    @debug "$(cg.name): invoking $name" args typ argtypes name
+    dump(args, maxdepth=7)
     # dump(args, maxdepth=2)
     if haskey(LLVM.functions(cg.mod), name)
         func = LLVM.functions(cg.mod)[name]
