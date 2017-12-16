@@ -224,7 +224,6 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     name = getfunname(args[1], argtypes)
     @info "$(cg.name): invoking $name"
     @debug "$(cg.name): invoking $name" args typ argtypes name
-    dump(args, maxdepth=7)
     # dump(args, maxdepth=2)
     if haskey(LLVM.functions(cg.mod), name)
         func = LLVM.functions(cg.mod)[name]
