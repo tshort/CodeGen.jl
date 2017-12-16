@@ -476,8 +476,8 @@ codegen!(cg::CodeCtx, x::Type{T}) where T = load_and_emit_datatype!(cg, x)
 
 function load_and_emit_datatype!(cg, ::Type{JT}) where JT
     if haskey(cg.datatype, JT)
-        # return LLVM.load!(cg.builder, cg.datatype[JT])
-        return cg.datatype[JT]
+        return LLVM.load!(cg.builder, cg.datatype[JT])
+        # return cg.datatype[JT]
     end
     name = string(JT)
     @info "$(cg.name): emitting new type: $name"
@@ -509,7 +509,8 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
     LLVM.API.LLVMSetInitializer(LLVM.ref(loc), LLVM.ref(null(jl_value_t_ptr)))
     store!(cg, dt, loc)
     result = LLVM.load!(cg.builder, loc)
-    cg.datatype[JT] = result
+    # cg.datatype[JT] = result
+    cg.datatype[JT] = loc
     return result
 end
 

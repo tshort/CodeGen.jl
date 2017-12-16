@@ -1,12 +1,17 @@
 
 abstract type AbstractCodeCtx end
 
+mutable struct LoggingBuilder
+    builder::LLVM.Builder
+end
+
+
 """
 The `CodeCtx` type holds the main state for code generation. 
 One instance is used per function being compiled.
 """
 mutable struct CodeCtx <: AbstractCodeCtx
-    builder::LLVM.Builder
+    builder::LoggingBuilder
     mod::LLVM.Module
     name::String
     code_info::CodeInfo
@@ -24,7 +29,7 @@ mutable struct CodeCtx <: AbstractCodeCtx
     builtin::Dict{Symbol, LLVM.Function}
     datatype::Dict{Type, Any}
     CodeCtx(mod::LLVM.Module, name, ci::CodeInfo, result_type, argtypes, sig) = 
-        new(LLVM.Builder(ctx),
+        new(LoggingBuilder(LLVM.Builder(ctx)),
             mod, 
             name,
             ci,

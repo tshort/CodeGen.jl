@@ -15,5 +15,6 @@ include("boxing.jl")
 include("intrinsics.jl")
 include("builtins.jl")
 include("run.jl")
+include("misc.jl")
 
 end # module
