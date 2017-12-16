@@ -90,6 +90,9 @@ function codegen!(cg::CodeCtx)
         @debug "$(cg.name): node $i/$(length(ci.code))" node
         codegen!(cg, node)
     end
+    if !has_terminator(entry)
+        LLVM.unreachable!(cg.builder)
+    end
     # LLVM.verify(cg.func)
     LLVM.dispose(cg.builder)
     return cg.mod

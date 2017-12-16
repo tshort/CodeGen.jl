@@ -9,10 +9,11 @@ configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
 function test_arrays(x)
-    y = Int[1,2,x]
-    yy = Int[3,4,5]
-    zz = y .+ yy
-    return zz[1]
+    y = fill(2pi, 5)
+    push!(y, 3x)
+    z = reverse(y)
+    zz = y .+ z.^2
+    return maximum(zz)
 end
 m = codegen(test_arrays, Tuple{Int})
 verify(m)
