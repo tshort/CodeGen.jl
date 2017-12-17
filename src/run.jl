@@ -90,7 +90,3 @@ end
 
 # Base.write(cg::CodeGen, path::String) = write(cg.mod, path)
 
-
-export basedump
-basedump(@nospecialize(fun), @nospecialize(argtypes)) = 
-    print(Base._dump_function(fun, argtypes, false, true, false, true, :att, false))

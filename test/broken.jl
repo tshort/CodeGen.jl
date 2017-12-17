@@ -8,14 +8,7 @@ using MicroLogging
 configure_logging(min_level=:info)
 configure_logging(min_level=:debug)
 
-function test_arrays(x)
-    y = fill(2pi, 5)
-    push!(y, 3x)
-    z = reverse(y)
-    zz = y .+ z.^2
-    return maximum(zz)
-end
-m = codegen(test_arrays, Tuple{Int})
+m = codegen(Base.throw_inexacterror,Tuple{Symbol,Type{Int32},Int32})
 verify(m)
 
 # function test_arrays(x)
