@@ -93,7 +93,7 @@ function codegen!(cg::CodeCtx)
     if !has_terminator(entry)
         LLVM.unreachable!(cg.builder)
     end
-    # LLVM.verify(cg.func)
+    LLVM.verify(cg.func)
     LLVM.dispose(cg.builder)
     return cg.mod
 end
@@ -255,8 +255,12 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     end
     llvmargs = LLVM.Value[]
     startpos = isa(args[1], Core.MethodInstance) ? 3 : 2
-    for v in args[startpos:end]
-        push!(llvmargs, codegen!(cg, v))
+    for (i,v) in enumerate(args[startpos:end])
+        a = codegen!(cg, v)
+        if llvmtype(argtypes.parameters[i]) != LLVM.llvmtype(a)  # kludgey?
+            a = emit_box!(cg, v)
+        end
+        push!(llvmargs, a)
     end
     return LLVM.call!(cg.builder, func, llvmargs)
 end
