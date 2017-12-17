@@ -230,6 +230,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     elseif name == "throw_overflowerr_binaryop_Symbol_Int32_Int32"
         return codegen!(cg, Int32(888)) # KLUDGE - WRONG
     else
+        fun = getfun(args[1])
         global MI = args[1]
         @debug "$(cg.name): invoke argtypes" args argtypes
         if isa(args[1], Core.MethodInstance)  && isdefined(args[1], :inferred) && args[1].inferred != nothing
@@ -238,7 +239,6 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
             dt = MI.rettype
             sig = MI.def.sig
         else
-            fun = getfun(args[1])
             methodtable = code_typed(fun, argtypes, optimize = true)
             if length(methodtable) < 1
                 @show fun
@@ -249,7 +249,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
             ci, dt = methodtable[1]
             sig = first(methods(fun, argtypes)).sig
         end
-        newcg = CodeCtx(cg, name, ci, dt, argtypes, sig)
+        newcg = CodeCtx(cg, name, ci, dt, argtypes, fun, sig)
         codegen!(newcg)
         func = newcg.func
     end
@@ -358,11 +358,20 @@ codegen!(cg::CodeCtx, ::Tuple{}) = cg.datatype[Tuple{}]
 
 codegen!(cg::CodeCtx, ::Val{:meta}, args, typ) = nothing
 
-codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ) = codegen!(cg, args[1])
-
 codegen!(cg::CodeCtx, ::Val{:simdloop}, args, typ) = nothing
 codegen!(cg::CodeCtx, ::Val{:gc_preserve_begin}, args, typ) = codegen!(cg, args[1])
 codegen!(cg::CodeCtx, ::Val{:gc_preserve_end}, args, typ) = codegen!(cg, args[1])
+
+function codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ)
+    @debug "$(cg.name) emit static_parameter found: $args" 
+    # Adapted from https://github.com/SimonDanisch/Sugar.jl/blob/afa3da222b3b3eb1df3fe1be76b4d892e91c9d98/src/methods.jl#L350-L357
+    world = typemax(UInt)
+    y = Base._methods(cg.jfun, cg.argtypes, -1, world)
+    isempty(y) && return ()
+    x = first(y)
+    val = tuple(x[2]...)[args[1]] 
+    codegen!(cg, val)
+end
 
 
 #

@@ -63,8 +63,8 @@ CodeCtx(; triple = nothing, datalayout = nothing) =
     cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), "", CodeInfo(), Void, Tuple{}, "", Tuple{}, triple = triple, datalayout = datalayout)
 
 
-function CodeCtx(orig_cg::CodeCtx, name, ci::CodeInfo, result_type, argtypes, sig)
-    cg = CodeCtx(orig_cg.mod, name, ci, result_type, argtypes, orig_cg.jfun, sig)
+function CodeCtx(orig_cg::CodeCtx, name, ci::CodeInfo, result_type, argtypes, jfun, sig)
+    cg = CodeCtx(orig_cg.mod, name, ci, result_type, argtypes, jfun, sig)
     cg.builtin = orig_cg.builtin
     cg.extern = orig_cg.extern
     cg.datatype = orig_cg.datatype

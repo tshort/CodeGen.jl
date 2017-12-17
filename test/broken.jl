@@ -14,12 +14,11 @@ verify(m)
 # basedump(Base.throw_inexacterror,Tuple{Symbol,Type{Int32},Int32})
 
 # function test_arrays(x)
-#     y = fill(x, 5)
-#     yy = fill(2x, 5)
-#     # push!(y, 3x)
-#     # z = reverse(y)
-#     zz = y .+ yy.^2
-#     return zz[1]
+#     y = fill(2pi, 5)
+#     push!(y, 3x)
+#     z = reverse(y)
+#     zz = y .+ z.^2
+#     return maximum(zz)
 # end
 # m = codegen(test_arrays, Tuple{Int})
 # verify(m)
