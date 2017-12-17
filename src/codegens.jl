@@ -23,7 +23,7 @@ function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     sig = first(methods(fun, argtypes)).sig
     funname = getfunname(fun, argtypes)
-    cg = CodeCtx(funname, ci, dt, argtypes, sig)
+    cg = CodeCtx(funname, ci, dt, argtypes, fun, sig)
     return codegen!(cg)
 end
 getfunname(fun, argtypes) = string(basename(fun), "_", join(collect(argtypes.parameters), "_"))
@@ -102,7 +102,7 @@ function codegen!(cg::CodeCtx, @nospecialize(fun), @nospecialize(argtypes); opti
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     funname = getfunname(fun, argtypes)
     sig = first(methods(fun, argtypes)).sig
-    return codegen!(CodeCtx(cg, funname, ci, dt, argtypes, sig))
+    return codegen!(CodeCtx(cg, funname, ci, dt, argtypes, fun, sig))
 end
 
 

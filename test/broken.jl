@@ -11,6 +11,8 @@ configure_logging(min_level=:debug)
 m = codegen(Base.throw_inexacterror,Tuple{Symbol,Type{Int32},Int32})
 verify(m)
 
+# basedump(Base.throw_inexacterror,Tuple{Symbol,Type{Int32},Int32})
+
 # function test_arrays(x)
 #     y = fill(x, 5)
 #     yy = fill(2x, 5)
