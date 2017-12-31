@@ -61,7 +61,7 @@ function codegen!(cg::CodeCtx)
     end
     for i in 1:length(argtypes)
         if isa(argtypes[i], LLVM.VoidType)
-            argtypes[i] = int32_t
+            argtypes[i] = llvmtype(Int)
         end
     end
     func_type = LLVM.FunctionType(llvmtype(cg.result_type), argtypes)
@@ -87,13 +87,13 @@ function codegen!(cg::CodeCtx)
         end
     end
     for (i, node) in enumerate(ci.code)
-        @debug "$(cg.name): node $i/$(length(ci.code))" node
+        @debug "$(cg.name): ***** node $i/$(length(ci.code)) ***** " node
         codegen!(cg, node)
     end
     if !has_terminator(entry)
         LLVM.unreachable!(cg.builder)
     end
-    LLVM.verify(cg.func)
+    # LLVM.verify(cg.func)
     LLVM.dispose(cg.builder)
     return cg.mod
 end
@@ -169,7 +169,7 @@ function codegen!(cg::CodeCtx, f::GlobalRef)
     else
         # If we refer to something global that we don't have, need to add it as a global variable.
         # return emit_box!(cg, Int32(999)) # KLUDGE - WRONG
-        return codegen!(cg, Int32(999)) # KLUDGE - WRONG
+        return codegen!(cg, 999) # KLUDGE - WRONG
     end
 end
 
@@ -180,6 +180,9 @@ function codegen!(cg::CodeCtx, x::T) where {T}
         return codegen!(cg, 0)   # I'm not sure how to handle singleton types
     end
     error("Unsupported type: $T")
+end
+function codegen!(cg::CodeCtx, x::T) where {T<:Union{LLVM.LoadInst,LLVM.ConstantInt}}
+    return x
 end
 
 #
@@ -199,7 +202,7 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     end
     if isa(fun, Core.Builtin)
         @debug "$(cg.name): calling builtin: $name"
-        return emit_unbox!(cg, emit_builtin!(cg, args[1].name, args[2:end], typ), typ)
+        return emit_unbox!(cg, emit_builtin!(cg, basename(args[1]), args[2:end], typ), typ)
     end
     @debug "$(cg.name): calling other method: $name" args
     ## NOTE: everything past here may be wrong!
@@ -257,7 +260,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     startpos = isa(args[1], Core.MethodInstance) ? 3 : 2
     for (i,v) in enumerate(args[startpos:end])
         a = codegen!(cg, v)
-        if llvmtype(argtypes.parameters[i]) != LLVM.llvmtype(a)  # kludgey?
+        if i <= length(argtypes.parameters) && llvmtype(argtypes.parameters[i]) != LLVM.llvmtype(a)  # kludgey?
             a = emit_box!(cg, v)
         end
         push!(llvmargs, a)
@@ -356,7 +359,7 @@ codegen!(cg::CodeCtx, ::LineNumberNode) = nothing
 
 codegen!(cg::CodeCtx, ::NewvarNode) = nothing
 
-codegen!(cg::CodeCtx, ::Void) = cg.datatype[Void]
+codegen!(cg::CodeCtx, ::Nothing) = cg.datatype[Nothing]
 
 codegen!(cg::CodeCtx, ::Tuple{}) = cg.datatype[Tuple{}]
 
@@ -375,6 +378,10 @@ function codegen!(cg::CodeCtx, ::Val{:static_parameter}, args, typ)
     x = first(y)
     val = tuple(x[2]...)[args[1]] 
     codegen!(cg, val)
+end
+
+function codegen!(cg::CodeCtx, ::Val{:boundscheck}, args, typ)
+    return codegen!(cg, 999) # KLUDGE - WRONG
 end
 
 
@@ -497,7 +504,7 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
         # return cg.datatype[JT]
     end
     name = string(JT)
-    @info "$(cg.name): emitting new type: $name"
+    # @info "$(cg.name): emitting new type: $name"
     typeof(JT) != DataType && error("Not supported, yet")
         # JL_DLLEXPORT jl_value_t *jl_type_union(jl_value_t **ts, size_t n);
 

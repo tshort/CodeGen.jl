@@ -69,6 +69,9 @@ function emit_box!(cg::CodeCtx, @nospecialize(x::T)) where T
         #     return v
         # end
     end
+    if T <: LLVM.Value   # BROKEN
+        return emit_box!(cg, LLVM.llvmtype(x), x)
+    end
     return v
     error("Boxing of $T not supported")
 end

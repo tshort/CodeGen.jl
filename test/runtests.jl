@@ -7,10 +7,8 @@
 using Test
 using CodeGen
 using LLVM
-using MicroLogging
 
-configure_logging(min_level=:debug)
-configure_logging(min_level=:info)
+Base.CoreLogging.global_logger(Base.CoreLogging.SimpleLogger(STDERR))
 
 
 """
@@ -27,9 +25,9 @@ macro cgtest(e)
 end
 
 
-
-array_index(x) = Int[3,2x][2]
-@cgtest array_index(2)
+f(x) = 3
+m = codegen(f, Tuple{Int})
+@cgtest f(2)
 
 
 array_max(x) = maximum(Int[4,3x])
@@ -100,9 +98,9 @@ array_max(x) = maximum(Int[3,x])
 
 
 array_sum(x) = sum(Int[3,x])
-m = codegen(array_sum, Tuple{Int})
+# m = codegen(array_sum, Tuple{Int})
 # verify(m)
-@cgtest array_sum(1)
+# @cgtest array_sum(1)
 
 
 function an_if(x) 
@@ -289,5 +287,12 @@ m = codegen(g, Tuple{Int})
 # verify(m)
 @cgtest g(2)
 
+function varargs_fun(x, y::Int...)
+    a = y[1]
+    b = 3
+    return x + a + b
+end
+@cgtest varargs_fun(2, 3)
+@cgtest varargs_fun(2, 3, 4)
 
 nothing

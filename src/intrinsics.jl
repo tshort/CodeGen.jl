@@ -135,7 +135,7 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     name == :zext_int   && return LLVM.zext!(cg.builder, args[2], args[1])
     name == :fpzext     && return LLVM.fpext!(cg.builder, args[2], args[1])
     if name == :arraylen  
-        p = LLVM.bitcast!(cg.builder, args[1], LLVM.PointerType(llvmtype(Tuple{Ptr{Void}, Csize_t})))
+        p = LLVM.bitcast!(cg.builder, args[1], LLVM.PointerType(llvmtype(Tuple{Ptr{Nothing}, Csize_t})))
         len_p = LLVM.struct_gep!(cg.builder, p, 1)
         return LLVM.load!(cg.builder, len_p)
     end
@@ -173,8 +173,8 @@ function emit_intrinsic!(cg::CodeCtx, name, jlargs)
     ######
     # name == :pointerref && return LLVM.call!(cg.builder, cg.extern[:jl_pointerref], LLVM.Value[emit_box!(cg, args[1]), emit_box!(cg, args[2]), emit_box!(cg, args[3])])
     # name == :pointerset && return LLVM.call!(cg.builder, cg.extern[:jl_pointerset], LLVM.Value[emit_box!(cg, args[1]), emit_box!(cg, args[2]), emit_box!(cg, args[3]), emit_box!(cg, args[4])])
-    name == :pointerref && return LLVM.call!(cg.builder, cg.extern[:jl_pointerref], LLVM.Value[args[1], args[2], args[3]])
-    name == :pointerset && return LLVM.call!(cg.builder, cg.extern[:jl_pointerset], LLVM.Value[args[1], args[2], args[3], args[4]])
+    name == :pointerref && return LLVM.call!(cg.builder, cg.extern[:jl_pointerref], LLVM.Value[emit_box!(cg, args[1]), emit_box!(cg, args[2]), emit_box!(cg, args[3])])
+    name == :pointerset && return LLVM.call!(cg.builder, cg.extern[:jl_pointerset], LLVM.Value[emit_box!(cg, args[1]), emit_box!(cg, args[2]), emit_box!(cg, args[3]), emit_box!(cg, args[4])])
 
     error("Unsupported intrinsic: $name")
 end

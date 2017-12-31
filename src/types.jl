@@ -3,6 +3,7 @@ abstract type AbstractCodeCtx end
 
 mutable struct LoggingBuilder
     builder::LLVM.Builder
+    name::String
 end
 
 
@@ -30,7 +31,7 @@ mutable struct CodeCtx <: AbstractCodeCtx
     builtin::Dict{Symbol, LLVM.Function}
     datatype::Dict{Type, Any}
     CodeCtx(mod::LLVM.Module, name, ci::CodeInfo, result_type, argtypes, jfun, sig) = 
-        new(LoggingBuilder(LLVM.Builder(ctx)),
+        new(LoggingBuilder(LLVM.Builder(ctx), name),
             mod, 
             name,
             ci,
@@ -60,7 +61,7 @@ function CodeCtx(name, ci::CodeInfo, result_type, argtypes, jfun, sig; triple = 
 end
 
 CodeCtx(; triple = nothing, datalayout = nothing) = 
-    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), "", CodeInfo(), Void, Tuple{}, "", Tuple{}, triple = triple, datalayout = datalayout)
+    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), "", CodeInfo(), Nothing, Tuple{}, "", Tuple{}, triple = triple, datalayout = datalayout)
 
 
 function CodeCtx(orig_cg::CodeCtx, name, ci::CodeInfo, result_type, argtypes, jfun, sig)
@@ -86,7 +87,7 @@ function CodeCtx_init(@nospecialize(fun), @nospecialize(argtypes); optimize_lowe
     sig = first(methods(fun, argtypes)).sig
     funname = string(Base.function_name(fun))
     cg = CodeCtx(funname, ci, dt, argtypes, fun, sig)
-    @info "## $(cg.name)"
+    # @info "## $(cg.name)"
     ci = cg.code_info
     argtypes = LLVMType[llvmtype(p) for p in cg.argtypes.parameters]
     for i in 1:length(argtypes)

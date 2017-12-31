@@ -3,11 +3,10 @@
 using Test
 using CodeGen
 using LLVM
-using MicroLogging
 
-configure_logging(min_level=:info)
-configure_logging(min_level=:debug)
-
+# configure_logging(min_level=:info)
+# configure_logging(min_level=:debug)
+Base.CoreLogging.global_logger(Base.CoreLogging.SimpleLogger(STDERR, Base.CoreLogging.Debug))
 
 f(x) = string("a", x)
 m = codegen(f, Tuple{Int})
@@ -26,14 +25,6 @@ verify(m)
 
 
 
-# function varargs_fun(y::Int...)
-#     a = y[1]
-#     b = 3
-#     return a + b
-# end
-# ci = code_typed(varargs_fun, Tuple{Int, Int})
-# m = first(methods(varargs_fun, Tuple{Int, Int}))
-# m = codegen(varargs_fun, Tuple{Int, Int})   # segfaults
 
 
 # ci = code_typed(string, Tuple{String, String})

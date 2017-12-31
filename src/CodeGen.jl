@@ -6,7 +6,6 @@ export optimize!, @jitrun, @jlrun
 
 
 using LLVM
-using MicroLogging
 
 include("types.jl")        # CodeCtx
 include("codegens.jl")

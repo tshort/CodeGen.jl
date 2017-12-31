@@ -2,7 +2,7 @@
 # Sets up global values for LLVM types, Julia types, external declarations, and other utilities.
 # 
 
-const ctx = LLVM.Context(convert(LLVM.API.LLVMContextRef, cglobal(:jl_LLVMContext, Void)))
+const ctx = LLVM.Context(convert(LLVM.API.LLVMContextRef, cglobal(:jl_LLVMContext, Nothing)))
 
 # Convert a Julia type to an LLVM type
 # Note that LLVM.llvmtype returns the LLVM type of an LLVM value (could combine?)
@@ -42,7 +42,7 @@ const float_t  = llvmtype(Float32)
 const double_t = llvmtype(Float64)
 const float32_t = llvmtype(Float32)
 const float64_t = llvmtype(Float64)
-const void_t    = llvmtype(Void)
+const void_t    = llvmtype(Nothing)
 const size_t    = llvmtype(Int)
 
 const int8_t_ptr  = LLVM.PointerType(int8_t)
@@ -135,7 +135,7 @@ end
 
 # TODO: fill in more
 const type_g = Dict{Type, Symbol}(
-    Void    => :jl_void_type_g,
+    Nothing => :jl_void_type_g,
     Bool    => :jl_bool_type_g,
     Int8    => :jl_int8_type_g,
     Int16   => :jl_int16_type_g,
@@ -230,7 +230,7 @@ function setup_types!(cg)
     setup_type!(jl_datatype_t_ptr, "jl_float64_type", Float64)
     setup_type!(jl_datatype_t_ptr, "jl_floatingpoint_type", AbstractFloat)
     setup_type!(jl_datatype_t_ptr, "jl_number_type", Number)
-    setup_type!(jl_datatype_t_ptr, "jl_void_type", Void)
+    setup_type!(jl_datatype_t_ptr, "jl_void_type", Nothing)
     setup_type!(jl_datatype_t_ptr, "jl_signed_type", Signed)
     setup_type!(jl_datatype_t_ptr, "jl_voidpointer_type")
     setup_type!(jl_unionall_t_ptr, "jl_pointer_type", Ptr)
