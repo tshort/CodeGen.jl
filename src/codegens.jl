@@ -93,7 +93,7 @@ function codegen!(cg::CodeCtx)
     if !has_terminator(entry)
         LLVM.unreachable!(cg.builder)
     end
-    LLVM.verify(cg.func)
+    # LLVM.verify(cg.func)
     LLVM.dispose(cg.builder)
     return cg.mod
 end
@@ -294,11 +294,13 @@ getargtypes(x::Method) = Tuple{x.sig.parameters[2:end]...}
 getfun(x::Core.MethodInstance) = getfun(x.def)
 getfun(x::Method) = getfield(x.module, basename(x))
 
+is_nothing(x) = false
+is_nothing(::Nothing) = true
+is_nothing(x::GlobalRef) = x.name == :nothing
+
 function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
-    if length(args) == 1 && args[1] != nothing
+    if length(args) == 1 && !is_nothing(args[1])
         res = codegen!(cg, args[1])
-        # @show LLVM.llvmtype(res)
-        # @show llvmtype(cg.result_type)
         if LLVM.llvmtype(res) == int1_t
             res = LLVM.zext!(cg.builder, res, int8_t)
         elseif LLVM.llvmtype(res) != llvmtype(cg.result_type)
