@@ -12,6 +12,10 @@ emit_map = Dict(
     Int16 => :jl_box_int16,
     Int32 => :jl_box_int32,
     Int64 => :jl_box_int64,
+    UInt8 => :jl_box_uint8,
+    UInt16 => :jl_box_uint16,
+    UInt32 => :jl_box_uint32,
+    UInt64 => :jl_box_uint64,
     Float32 => :jl_box_float32,
     Float64 => :jl_box_float64)
 
@@ -20,9 +24,10 @@ emit_box!(cg::CodeCtx, x::T) where {T <: bitsT}  = LLVM.call!(cg.builder, cg.ext
 emit_box!(cg::CodeCtx, x::Bool) = LLVM.call!(cg.builder, cg.extern[:jl_box_bool], LLVM.Value[emit_val!(cg, codegen!(cg, x))])
 
 function emit_box!(cg::CodeCtx, x::SlotNumber)
-    if haskey(emit_map, x.id)
-        @debug "$(cg.name): boxing SlotNumber $(x.id)" typ=cg.code_info.slottypes[x.id]
-        return LLVM.call!(cg.builder, cg.extern[cg.code_info.slottypes[x.id]], LLVM.Value[codegen!(cg, x)])
+    slottype = cg.code_info.slottypes[x.id]
+    @debug "$(cg.name): boxing Slot $(x.id)" slottype
+    if haskey(emit_map, slottype)
+        return LLVM.call!(cg.builder, cg.extern[emit_map[slottype]], LLVM.Value[codegen!(cg, x)])
     else
         return codegen!(cg, x)
     end
@@ -42,13 +47,14 @@ end
 emit_box!(cg::CodeCtx, e::Expr) = LLVM.call!(cg.builder, cg.extern[emit_map[e.typ]], LLVM.Value[codegen!(cg, e)])
 
 function emit_box!(cg::CodeCtx, v::LLVM.Value)
+    f!(s::Symbol) = LLVM.call!(cg.builder, cg.extern[s], LLVM.Value[v])
     t = LLVM.llvmtype(v)
-    return t == int8_t ? emit_box!(cg, :jl_box_int8, v) : 
-           t == int16_t ? emit_box!(cg, :jl_box_int16, v) : 
-           t == int32_t ? emit_box!(cg, :jl_box_int32, v) :
-           t == int64_t ? emit_box!(cg, :jl_box_int64, v) :
-           t == float32_t ? emit_box!(cg, :jl_box_float32, v) :
-           t == float64_t ? emit_box!(cg, :jl_box_float64, v) : error("not supported")
+    return t == int8_t ? f!(:jl_box_int8) : 
+           t == int16_t ? f!(:jl_box_int16) : 
+           t == int32_t ? f!(:jl_box_int32) :
+           t == int64_t ? f!(:jl_box_int64) :
+           t == float32_t ? f!(:jl_box_float32) :
+           t == float64_t ? f!(:jl_box_float64) : error("not supported")
 end
 
 # function emit_box!(cg::CodeCtx, ::Type{T}, v) where T <: Tuple

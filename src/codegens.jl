@@ -93,7 +93,7 @@ function codegen!(cg::CodeCtx)
     if !has_terminator(entry)
         LLVM.unreachable!(cg.builder)
     end
-    # LLVM.verify(cg.func)
+    LLVM.verify(cg.func)
     LLVM.dispose(cg.builder)
     return cg.mod
 end
