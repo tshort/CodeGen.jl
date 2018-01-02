@@ -19,7 +19,7 @@ emit_map = Dict(
     Float32 => :jl_box_float32,
     Float64 => :jl_box_float64)
 
-bitsT = Union{Int8, Int16, Int32, Int64, Float32, Float64}
+bitsT = Union{Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64}
 emit_box!(cg::CodeCtx, x::T) where {T <: bitsT}  = LLVM.call!(cg.builder, cg.extern[emit_map[T]], LLVM.Value[codegen!(cg, x)])
 emit_box!(cg::CodeCtx, x::Bool) = LLVM.call!(cg.builder, cg.extern[:jl_box_bool], LLVM.Value[emit_val!(cg, codegen!(cg, x))])
 
