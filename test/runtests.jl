@@ -9,6 +9,7 @@ using CodeGen
 using LLVM
 
 Base.CoreLogging.global_logger(Base.CoreLogging.SimpleLogger(STDERR))
+Base.CoreLogging.global_logger(Base.CoreLogging.SimpleLogger(STDERR, Base.CoreLogging.Debug))
 
 
 """
