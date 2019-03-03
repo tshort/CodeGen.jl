@@ -62,14 +62,15 @@ end
 
 
 function setup_builtins!(cg::CodeCtx)
+    println("here")
     builtin = Dict{Symbol, LLVM.Function}()
     function add_builtin_func(a, b)
-        func_type = LLVM.FunctionType(
+        @show func_type = LLVM.FunctionType(
             jl_value_t_ptr, 
             LLVMType[#=F=#     jl_value_t_ptr, 
                      #=args=#  jl_value_t_ptr_ptr, 
                      #=nargs=# uint32_t])
-        func = LLVM.Function(cg.mod, string(b), func_type)
+        @show func = LLVM.Function(cg.mod, string(b), func_type)
         LLVM.linkage!(func, LLVM.API.LLVMExternalLinkage)
         builtin[Symbol(a)] = func
     end

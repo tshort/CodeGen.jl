@@ -8,8 +8,8 @@ using Test
 using CodeGen
 using LLVM
 
-Base.CoreLogging.global_logger(Base.CoreLogging.SimpleLogger(STDERR))
-# Base.CoreLogging.global_logger(Base.CoreLogging.SimpleLogger(STDERR, Base.CoreLogging.Debug))
+Base.CoreLogging.global_logger(Base.CoreLogging.SimpleLogger(stderr))
+# Base.CoreLogging.global_logger(Base.CoreLogging.SimpleLogger(stderr, Base.CoreLogging.Debug))
 
 
 """

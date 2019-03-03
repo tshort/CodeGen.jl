@@ -27,7 +27,7 @@ function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering 
     return codegen!(cg)
 end
 getfunname(fun, argtypes) = string(basename(fun), "_", join(collect(argtypes.parameters), "_"))
-basename(f::Function) = Base.function_name(f)
+basename(f::Function) = nameof(f)
 basename(f::Core.IntrinsicFunction) = Symbol(unsafe_string(ccall(:jl_intrinsic_name, Cstring, (Core.IntrinsicFunction,), f)))
 basename(x::GlobalRef) = x.name
 basename(m::Core.MethodInstance) = basename(m.def)
@@ -68,7 +68,7 @@ function codegen!(cg::CodeCtx)
     cg.func = LLVM.Function(cg.mod, cg.name, func_type)
     cg.nargs = length(argtypes)
     LLVM.linkage!(cg.func, LLVM.API.LLVMExternalLinkage)
-    entry = LLVM.BasicBlock(cg.func, "entry", ctx)
+    entry = LLVM.BasicBlock(cg.func, "entry", JuliaContext())
     LLVM.position!(cg.builder, entry)
     for (i, param) in enumerate(LLVM.parameters(cg.func))
         argname = string(ci.slotnames[i + 1], "_as", i+1)
@@ -99,6 +99,7 @@ function codegen!(cg::CodeCtx)
 end
 
 function codegen!(cg::CodeCtx, @nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
+    dump(cg)
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     funname = getfunname(fun, argtypes)
     sig = first(methods(fun, argtypes)).sig
@@ -111,7 +112,7 @@ end
 #
 function codegen!(cg::CodeCtx, e::Expr)
     # Slow dispatches here but easy to write and to customize
-    codegen!(cg, Val(e.head), e.args, e.typ) 
+    codegen!(cg, Val(e.head), e.args) 
 end
 
 #
@@ -429,21 +430,21 @@ end
 #
 # Control flow
 #
-function codegen!(cg::CodeCtx, ln::LabelNode)
-    if !haskey(cg.labels, ln.label)
+function codegen!(cg::CodeCtx, ln::LineInfoNode)
+    if !haskey(cg.labels, ln.line)
         func = LLVM.parent(LLVM.position(cg.builder))
-        cg.labels[ln.label] = LLVM.BasicBlock(func, "L", ctx)
+        cg.labels[ln.label] = LLVM.BasicBlock(func, "L", JuliaContext())
     end
     if !has_terminator(position(cg.builder))
-        br!(cg.builder, cg.labels[ln.label])
+        br!(cg.builder, cg.labels[ln.line])
     end
-    position!(cg.builder, cg.labels[ln.label])
+    position!(cg.builder, cg.labels[ln.line])
 end
 
 function codegen!(cg::CodeCtx, gn::GotoNode)
     if !haskey(cg.labels, gn.label)
         func = LLVM.parent(LLVM.position(cg.builder))
-        cg.labels[gn.label] = LLVM.BasicBlock(func, "L", ctx)
+        cg.labels[gn.label] = LLVM.BasicBlock(func, "L", JuliaContext())
     end
     br!(cg.builder, cg.labels[gn.label])
 end
@@ -451,8 +452,8 @@ end
 function codegen!(cg::CodeCtx, ::Val{:gotoifnot}, args, typ)
     condv = emit_condition!(cg, codegen!(cg, args[1]))
     func = LLVM.parent(LLVM.position(cg.builder))
-    ifso = LLVM.BasicBlock(func, "if", ctx)
-    ifnot = LLVM.BasicBlock(func, "L", ctx)
+    ifso = LLVM.BasicBlock(func, "if", JuliaContext())
+    ifnot = LLVM.BasicBlock(func, "L", JuliaContext())
     cg.labels[args[2]] = ifnot
     LLVM.br!(cg.builder, condv, ifso, ifnot)
     position!(cg.builder, ifso)

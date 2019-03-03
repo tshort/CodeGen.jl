@@ -1,3 +1,4 @@
+import Base: CodeInfo, SSAValue, SlotNumber, GotoNode, NewvarNode, LineInfoNode
 
 abstract type AbstractCodeCtx end
 
@@ -31,7 +32,7 @@ mutable struct CodeCtx <: AbstractCodeCtx
     builtin::Dict{Symbol, LLVM.Function}
     datatype::Dict{Type, Any}
     CodeCtx(mod::LLVM.Module, name, ci::CodeInfo, result_type, argtypes, jfun, sig) = 
-        new(LoggingBuilder(LLVM.Builder(ctx), name),
+        new(LoggingBuilder(LLVM.Builder(JuliaContext()), name),
             mod, 
             name,
             ci,
@@ -40,8 +41,8 @@ mutable struct CodeCtx <: AbstractCodeCtx
             jfun,
             sig,
             length(argtypes.parameters),
-            Vector{LLVM.Value}(uninitialized, length(ci.slotnames)),
-            Vector{Any}(uninitialized, length(ci.slotnames)),
+            Vector{LLVM.Value}(undef, length(ci.slotnames)),
+            Vector{Any}(undef, length(ci.slotnames)),
             Dict{Int, LLVM.Value}(),
             Dict{Int, Any}(),
             Dict{Symbol, Any}()
@@ -49,7 +50,7 @@ mutable struct CodeCtx <: AbstractCodeCtx
 end
 
 function CodeCtx(name, ci::CodeInfo, result_type, argtypes, jfun, sig; triple = nothing, datalayout = nothing)
-    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), name, ci, result_type, argtypes, jfun, sig)
+    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", JuliaContext()), name, ci, result_type, argtypes, jfun, sig)
     global CG = cg
     M = cg.mod
     triple != nothing && triple!(cg.mod, triple)
@@ -61,7 +62,7 @@ function CodeCtx(name, ci::CodeInfo, result_type, argtypes, jfun, sig; triple = 
 end
 
 CodeCtx(; triple = nothing, datalayout = nothing) = 
-    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", ctx), "", CodeInfo(), Nothing, Tuple{}, "", Tuple{}, triple = triple, datalayout = datalayout)
+    cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", JuliaContext()), "", CodeInfo(), Nothing, Tuple{}, "", Tuple{}, triple = triple, datalayout = datalayout)
 
 
 function CodeCtx(orig_cg::CodeCtx, name, ci::CodeInfo, result_type, argtypes, jfun, sig)
@@ -99,7 +100,7 @@ function CodeCtx_init(@nospecialize(fun), @nospecialize(argtypes); optimize_lowe
     cg.func = LLVM.Function(cg.mod, cg.name, func_type)
     cg.nargs = length(argtypes)
     LLVM.linkage!(cg.func, LLVM.API.LLVMExternalLinkage)
-    entry = LLVM.BasicBlock(cg.func, "entry", ctx)
+    entry = LLVM.BasicBlock(cg.func, "entry", JuliaContext())
     LLVM.position!(cg.builder, entry)
     return cg
 end

@@ -1,3 +1,4 @@
+__precompile__(false)
 
 module CodeGen
 
@@ -6,6 +7,7 @@ export optimize!, @jitrun, @jlrun
 
 
 using LLVM
+using LLVM.Interop
 
 include("types.jl")        # CodeCtx
 include("codegens.jl")
