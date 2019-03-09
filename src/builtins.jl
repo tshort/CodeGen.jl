@@ -65,12 +65,12 @@ function setup_builtins!(cg::CodeCtx)
     println("here")
     builtin = Dict{Symbol, LLVM.Function}()
     function add_builtin_func(a, b)
-        @show func_type = LLVM.FunctionType(
+        func_type = LLVM.FunctionType(
             jl_value_t_ptr, 
             LLVMType[#=F=#     jl_value_t_ptr, 
                      #=args=#  jl_value_t_ptr_ptr, 
                      #=nargs=# uint32_t])
-        @show func = LLVM.Function(cg.mod, string(b), func_type)
+        func = LLVM.Function(cg.mod, string(b), func_type)
         LLVM.linkage!(func, LLVM.API.LLVMExternalLinkage)
         builtin[Symbol(a)] = func
     end
@@ -82,6 +82,7 @@ function setup_builtins!(cg::CodeCtx)
     add_builtin_func("typeassert", :jl_f_typeassert);
     add_builtin_func("throw", :jl_f_throw);
     add_builtin_func("tuple", :jl_f_tuple);
+    add_builtin_func("ifelse", :jl_f_ifelse);
 
     # // field access
     add_builtin_func("getfield",  :jl_f_getfield);
@@ -92,6 +93,7 @@ function setup_builtins!(cg::CodeCtx)
 
     # // array primitives
     add_builtin_func("arrayref", :jl_f_arrayref);
+    add_builtin_func("const_arrayref", :jl_f_arrayref);
     add_builtin_func("arrayset", :jl_f_arrayset);
     add_builtin_func("arraysize", :jl_f_arraysize);
 

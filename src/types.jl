@@ -1,4 +1,4 @@
-import Base: CodeInfo, SSAValue, SlotNumber, GotoNode, NewvarNode, LineInfoNode
+import Base: CodeInfo, SSAValue, SlotNumber, GotoNode, NewvarNode, LineInfoNode, PiNode, PhiNode
 
 abstract type AbstractCodeCtx end
 
@@ -22,10 +22,13 @@ mutable struct CodeCtx <: AbstractCodeCtx
     jfun
     sig
     nargs::Int
+    currentline::Int
     slots::Vector{LLVM.Value}
     slotlocs::Vector{Any}
-    ssas::Dict{Int, LLVM.Value}
+    ssas::Dict{Int,LLVM.Value}
+    positions::Vector{LLVM.Value}
     labels::Dict{Int, Any}
+    phis::Dict{Any, PhiNode}
     meta::Dict{Symbol, Any}
     func::LLVM.Function
     extern::Dict{Symbol, Any}
@@ -41,17 +44,20 @@ mutable struct CodeCtx <: AbstractCodeCtx
             jfun,
             sig,
             length(argtypes.parameters),
+            0,
             Vector{LLVM.Value}(undef, length(ci.slotnames)),
             Vector{Any}(undef, length(ci.slotnames)),
             Dict{Int, LLVM.Value}(),
+            Vector{LLVM.Value}(),
             Dict{Int, Any}(),
+            Dict{Any, PhiNode}(),
             Dict{Symbol, Any}()
             )
 end
 
 function CodeCtx(name, ci::CodeInfo, result_type, argtypes, jfun, sig; triple = nothing, datalayout = nothing)
     cg = CodeCtx(LLVM.Module("JuliaCodeGenModule", JuliaContext()), name, ci, result_type, argtypes, jfun, sig)
-    global CG = cg
+    CG = cg
     M = cg.mod
     triple != nothing && triple!(cg.mod, triple)
     datalayout != nothing && datalayout!(cg.mod, datalayout)

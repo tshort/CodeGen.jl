@@ -24,7 +24,7 @@ emit_box!(cg::CodeCtx, x::T) where {T <: bitsT}  = LLVM.call!(cg.builder, cg.ext
 emit_box!(cg::CodeCtx, x::Bool) = LLVM.call!(cg.builder, cg.extern[:jl_box_bool], LLVM.Value[emit_val!(cg, codegen!(cg, x))])
 
 function emit_box!(cg::CodeCtx, x::SlotNumber)
-    slottype = cg.code_info.slottypes[x.id]
+    slottype = cg.argtypes.parameters[x.id - 1]
     @debug "$(cg.name): boxing Slot $(x.id)" slottype
     if haskey(emit_map, slottype)
         return LLVM.call!(cg.builder, cg.extern[emit_map[slottype]], LLVM.Value[codegen!(cg, x)])
@@ -137,14 +137,14 @@ function emit_unbox!(cg::CodeCtx, v, ::Type{T}) where T
 end
 
 Base.isbits(cg::CodeCtx, x) = false
-Base.isbits(cg::CodeCtx, x::SlotNumber) = isbits(cg.code_info.slottypes[x.id])
+Base.isbits(cg::CodeCtx, x::SlotNumber) = isbits(cg.argtypes.parameters[x.id - 1])
 Base.isbits(cg::CodeCtx, x::SSAValue) = isbits(cg.code_info.ssavaluetypes[x.id + 1])
 Base.isbits(cg::CodeCtx, x::Expr) = isbits(x.typ)
-Base.fieldnames(cg::CodeCtx, x::SlotNumber) = fieldnames(cg.code_info.slottypes[x.id])
+Base.fieldnames(cg::CodeCtx, x::SlotNumber) = fieldnames(cg.argtypes.parameters[x.id - 1])
 Base.fieldnames(cg::CodeCtx, x::SSAValue) = fieldnames(cg.code_info.ssavaluetypes[x.id + 1])
 Base.fieldnames(cg::CodeCtx, x::Expr) = fieldnames(x.typ)
-_typeof(cg::CodeCtx, x::SlotNumber) = cg.code_info.slottypes[x.id]
-_typeof(cg::CodeCtx, x::SSAValue) = cg.code_info.ssavaluetypes[x.id + 1]
+_typeof(cg::CodeCtx, x::SlotNumber) = cg.argtypes.parameters[x.id - 1]
+_typeof(cg::CodeCtx, x::SSAValue) = cg.code_info.ssavaluetypes[x.id]
 _typeof(cg::CodeCtx, x::Expr) = x.typ
 _typeof(cg::CodeCtx, x) = Base.typeof(x)
 _typeof(cg::CodeCtx, x::GlobalRef) = Any

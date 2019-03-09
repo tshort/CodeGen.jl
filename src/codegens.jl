@@ -23,7 +23,7 @@ function codegen(@nospecialize(fun), @nospecialize(argtypes); optimize_lowering 
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     sig = first(methods(fun, argtypes)).sig
     funname = getfunname(fun, argtypes)
-    cg = CodeCtx(funname, ci, dt, argtypes, fun, sig)
+    global cg = CodeCtx(funname, ci, dt, argtypes, fun, sig)
     return codegen!(cg)
 end
 getfunname(fun, argtypes) = string(basename(fun), "_", join(collect(argtypes.parameters), "_"))
@@ -80,16 +80,78 @@ function codegen!(cg::CodeCtx)
     end
     for i in cg.nargs+2:length(ci.slotnames)
         varname = string(ci.slotnames[i], "_s", i)
-        vartype = llvmtype(ci.slottypes[i])
+        vartype = llvmtype(cg.argtypes.parameters[i - 1])
         if !isa(vartype, LLVM.VoidType)
             alloc = LLVM.alloca!(cg.builder, vartype, varname)
             cg.slotlocs[i] = alloc
         end
     end
+    # look for places where we need to start a BasicBlock
+    branches = Set{Int}()
     for (i, node) in enumerate(ci.code)
-        @debug "$(cg.name): ***** node $i/$(length(ci.code)) ***** " node
-        codegen!(cg, node)
+        if node isa Expr
+            if node.head == :gotoifnot
+                push!(branches, node.args[2])
+                push!(branches, i + 1)
+            elseif node.head == :return || node.head == :unreachable
+                push!(branches, i + 1)
+            elseif node.head == :enter
+                push!(branches, i)
+                push!(branches, i + 1)
+                push!(branches, node.args[1])
+            end
+        elseif node isa GotoNode
+            push!(branches, node.label)
+            push!(branches, i + 1)
+        elseif node isa PhiNode
+            for e in node.edges
+                push!(branches, e)
+            end
+        end
     end
+    branches = sort(collect(branches))
+    @show branches
+    for b in branches 
+        func = LLVM.parent(LLVM.position(cg.builder))
+        cg.labels[b] = LLVM.BasicBlock(func, string("L", b), JuliaContext())
+    end
+    # process each line of the code
+    for (i, node) in enumerate(ci.code)
+        if node == nothing
+            continue
+        end
+        @info "$(cg.name): ***** node $i/$(length(ci.code)) ***** " node
+        cg.currentline = i
+        if i in branches    # need a BasicBlock
+            if !has_terminator(LLVM.position(cg.builder))
+                LLVM.br!(cg.builder, cg.labels[i])
+            end
+            LLVM.position!(cg.builder, cg.labels[i])
+        end
+        result = if node isa Expr
+            codegen!(cg, Val(node.head), node.args, ci.ssavaluetypes[i])
+        else
+            codegen!(cg, node)
+        end
+        @show result
+        if result != nothing
+            t = _fixed_type(ci.ssavaluetypes[i])
+            @info "$(cg.name): Assigning SSA" t llvmtype(t)
+            unboxed_result = emit_unbox!(cg, result, t)
+            p = alloca!(cg.builder, llvmtype(t))
+            store!(cg, unboxed_result, p)
+            cg.ssas[i] = p
+        end
+    end
+    # Fill in Phi's
+    for (phi,p) in cg.phis
+        append!(LLVM.incoming(phi), 
+            [(p.values[i] isa SSAValue ? cg.ssas[p.values[i].id] : 
+              p.values[i] isa SlotNumber ? cg.slotlocs[p.values[i].id] : codegen!(cg, p.values[i]), 
+            #   codegen!(cg, p.values[i]), 
+             cg.labels[p.edges[i]]) for i in 1:length(p.values)])
+    end
+    println("HERE")
     if !has_terminator(entry)
         LLVM.unreachable!(cg.builder)
     end
@@ -97,22 +159,22 @@ function codegen!(cg::CodeCtx)
     LLVM.dispose(cg.builder)
     return cg.mod
 end
+_fixed_type(x) = x
+_fixed_type(x::Core.Compiler.Const) = typeof(x.val)
 
 function codegen!(cg::CodeCtx, @nospecialize(fun), @nospecialize(argtypes); optimize_lowering = true) 
-    dump(cg)
     ci, dt = code_typed(fun, argtypes, optimize = optimize_lowering)[1]
     funname = getfunname(fun, argtypes)
     sig = first(methods(fun, argtypes)).sig
     return codegen!(CodeCtx(cg, funname, ci, dt, argtypes, fun, sig))
 end
 
-
 #
 # Expressions
 #
-function codegen!(cg::CodeCtx, e::Expr)
+function codegen!(cg::CodeCtx, e::Expr, typ)
     # Slow dispatches here but easy to write and to customize
-    codegen!(cg, Val(e.head), e.args) 
+    codegen!(cg, Val(e.head), e.args, typ) 
 end
 
 #
@@ -129,6 +191,7 @@ function codegen!(cg::CodeCtx, x::SlotNumber)
 end
 
 codegen!(cg::CodeCtx, x::SSAValue) = LLVM.load!(cg.builder, cg.ssas[x.id])
+# codegen!(cg::CodeCtx, x::SSAValue) = cg.ssas[x.id]
 
 function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
     result = codegen!(cg, args[2])
@@ -149,7 +212,7 @@ function codegen!(cg::CodeCtx, ::Val{:(=)}, args, typ)
         # if !isconcrete(t) # || sizeof(t) == 0
         #     return
         # end
-        @debug "$(cg.name): Assigning SSA $(args[1].id)" typ llvmtype(_typeof(cg, args[1]))
+        @info "$(cg.name): Assigning SSA $(args[1].id)" typ llvmtype(_typeof(cg, args[1]))
         # @info "$(cg.name): Assigning SSA $(args[1].id) $typ $result $(llvmtype(_typeof(cg, args[1])))"
         # dump(args)
         unboxed_result = emit_unbox!(cg, result, _typeof(cg, args[1]))
@@ -215,7 +278,7 @@ function codegen!(cg::CodeCtx, ::Val{:call}, args, typ)
     codegen!(cg, Val(:invoke), Any[method, args[2:end]...], typ)
     # error("Function $name not supported.")
 end
-gettypes(cg::CodeCtx, x::SlotNumber) = cg.code_info.slottypes[x.id]
+gettypes(cg::CodeCtx, x::SlotNumber) = cg.argtypes.parameters[x.id - 1]
 # gettypes(cg::CodeCtx, x::GlobalRef) = eval(x)
 gettypes(cg::CodeCtx, x::GlobalRef) = Type{Any}
 gettypes(cg::CodeCtx, x::Expr) = Type{Any}
@@ -235,7 +298,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
         return codegen!(cg, Int32(888)) # KLUDGE - WRONG
     else
         fun = getfun(args[1])
-        global MI = args[1]
+        MI = args[1]
         @debug "$(cg.name): invoke argtypes" args argtypes
         if isa(args[1], Core.MethodInstance)  && isdefined(args[1], :inferred) && args[1].inferred != nothing
             MI = args[1]
@@ -259,6 +322,7 @@ function codegen!(cg::CodeCtx, ::Val{:invoke}, args, typ)
     end
     llvmargs = LLVM.Value[]
     startpos = isa(args[1], Core.MethodInstance) ? 3 : 2
+    dump(args)
     for (i,v) in enumerate(args[startpos:end])
         a = codegen!(cg, v)
         if i <= length(argtypes.parameters) && llvmtype(argtypes.parameters[i]) != LLVM.llvmtype(a)  # kludgey?
@@ -311,6 +375,7 @@ function codegen!(cg::CodeCtx, ::Val{:return}, args, typ)
     else
         LLVM.ret!(cg.builder)
     end
+    return nothing
 end
 
 #
@@ -447,20 +512,33 @@ function codegen!(cg::CodeCtx, gn::GotoNode)
         cg.labels[gn.label] = LLVM.BasicBlock(func, "L", JuliaContext())
     end
     br!(cg.builder, cg.labels[gn.label])
+    return nothing
 end
 
 function codegen!(cg::CodeCtx, ::Val{:gotoifnot}, args, typ)
     condv = emit_condition!(cg, codegen!(cg, args[1]))
-    func = LLVM.parent(LLVM.position(cg.builder))
-    ifso = LLVM.BasicBlock(func, "if", JuliaContext())
-    ifnot = LLVM.BasicBlock(func, "L", JuliaContext())
-    cg.labels[args[2]] = ifnot
-    LLVM.br!(cg.builder, condv, ifso, ifnot)
-    position!(cg.builder, ifso)
+    # func = LLVM.parent(LLVM.position(cg.builder))
+    # ifso = LLVM.BasicBlock(func, "if", JuliaContext())
+    # ifnot = LLVM.BasicBlock(func, "L", JuliaContext())
+    # cg.labels[args[2]] = ifnot
+    LLVM.br!(cg.builder, condv, cg.labels[cg.currentline + 1], cg.labels[args[2]])
+    # position!(cg.builder, ifso)
+    return nothing
 end
 
 emit_condition!(cg, condv) = LLVM.width(LLVM.llvmtype(condv)) > 1 ?
         LLVM.trunc!(cg.builder, condv, int1_t) : condv
+
+function codegen!(cg::CodeCtx, p::PiNode)
+    codegen!(cg, p.val) 
+end
+
+function codegen!(cg::CodeCtx, p::PhiNode)
+    phi = LLVM.phi!(cg.builder, llvmtype(typeof(p.edges[1])), "phi")
+    cg.phis[phi] = p
+    return phi
+end
+
 
 
 #
@@ -516,7 +594,7 @@ function load_and_emit_datatype!(cg, ::Type{JT}) where JT
     super = load_and_emit_datatype!(cg, JT.super)
     params = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
         LLVM.Value[codegen!(cg, length(JT.parameters)), [load_and_emit_datatype!(cg, t) for t in JT.parameters]...])
-    if isconcrete(JT)
+    if isconcretetype(JT)
         fnames = LLVM.call!(cg.builder, cg.extern[:jl_svec], 
             LLVM.Value[codegen!(cg, length(fieldnames(JT))), [emit_symbol!(cg, s) for s in fieldnames(JT)]...])
         ftypes = LLVM.call!(cg.builder, cg.extern[:jl_svec], 

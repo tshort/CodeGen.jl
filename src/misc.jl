@@ -2,7 +2,7 @@
 # Wrap builders with logging
 fns =  [:add!, :alloca!, :and!, :array_alloca!, :ashr!, :bitcast!, :br!, :call!, :dispose, :extract_value!, 
         :fadd!, :fcmp!, :fdiv!, :fmul!, :fneg!, :fpext!, :fptosi!, :fptoui!, :fptrunc!, :frem!, :fsub!, 
-        :gep!, :globalstring_ptr!, :icmp!, :inttoptr!, :load!, :lshr!, :mul!, :neg!, :not!, :or!, :position, 
+        :gep!, :globalstring_ptr!, :icmp!, :inttoptr!, :load!, :lshr!, :mul!, :neg!, :not!, :or!, :phi!, :position, 
         :position!, :ptrtoint!,
         :ret!, :sdiv!, :select!, :sext!, :shl!, :sitofp!, :srem!, :store!, :struct_gep!, :sub!, 
         :trunc!, :udiv!, :uitofp!, :unreachable!, :urem!, :xor!, :zext!]

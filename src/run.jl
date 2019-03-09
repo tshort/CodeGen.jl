@@ -78,7 +78,9 @@ function _jlrun(fun, args...)
         ci = code_typed(efun, tt)
         restype = last(last(ci))
         funname = string(efun)
-        innerfun() = Base.llvmcall(LLVM.ref(functions(mod)[funname]), restype, tt, $(esc(args...)))
+        @show mod
+        @show functions(mod)
+        innerfun() = Base.llvmcall(LLVM.ref(first(functions(mod))), restype, tt, $(esc.(args)...))
         innerfun()
     end
 end
